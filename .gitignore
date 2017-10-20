@@ -1,0 +1,95 @@
+# Office files #
+################
+*.docx
+*.doc
+*.xlsx
+*.xls
+*.odt
+*.ppt
+*.pptx
+
+# Compiled source and cached #
+##############################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.s
+*.ii
+*.so
+*.pyc
+
+# Graphics files #
+##################
+*.pdf
+*.ps
+*.eps
+*.gif
+*.dat
+*.png
+
+# Build directories
+###################
+build
+
+# Packages #
+############
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+*.tgz
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+core
+
+# backup files #
+################
+*~
+*#
+*old
+*.bak
+
+# OpenFOAM build files but not run directory #
+########################
+*.dep
+linux*
+lnInclude
+
+# Latex generated files #
+#########################
+*.aux
+*.out
+*.spl
+*.dvi
+*.bbl
+*.blg
+*.fff
+*.lof
+*.lot
+*.ttt
+
+# video files
+*.gif
+*.ogv
+
+# Datafiles
+*.nc
+*.grib
+*.dat
+
+
