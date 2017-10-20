@@ -1,0 +1,53 @@
+&datein
+  inp%bcc=,
+  inp%byy=,
+  inp%bmm=,
+  inp%bdd=,
+  inp%bhh=,
+  inp%model=4,
+  inp%lt_units='hour',
+  inp%file_seq='onebig',
+  inp%modtyp='global',
+  inp%nesttyp='fixed'
+  inp%filetype=,
+/
+&atcfinfo
+  atcfnum=81,
+  atcfname=,
+  atcfymdh=,
+  atcffreq=,
+/
+&trackerinfo
+  trkrinfo%westbd=,
+  trkrinfo%eastbd=,
+  trkrinfo%northbd=,
+  trkrinfo%southbd=,
+  trkrinfo%type=,
+  trkrinfo%mslpthresh=,
+  trkrinfo%choose_t2='y',
+  trkrinfo%mslpthresh2=,
+  trkrinfo%v850thresh=,
+  trkrinfo%gridtype='global',
+  trkrinfo%contint=,
+  trkrinfo%out_vit='y',
+/
+&phaseinfo
+  phaseflag='y',
+  phasescheme='both',
+  wcore_depth=,
+/
+&structinfo
+  structflag='y',
+  ikeflag='n',
+/
+&fnameinfo
+  gmodname='gmodname',
+  rundescr='rundescr',
+  atcfdescr='atcfdescr',
+/
+&waitinfo
+  use_waitfor='n',
+/
+&verbose
+   verb=,
+/
