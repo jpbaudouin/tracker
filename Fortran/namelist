@@ -1,53 +1,42 @@
-&datein
-  inp%bcc=,
-  inp%byy=,
-  inp%bmm=,
-  inp%bdd=,
-  inp%bhh=,
-  inp%model=4,
-  inp%lt_units='hour',
-  inp%file_seq='onebig',
-  inp%modtyp='global',
-  inp%nesttyp='fixed'
-  inp%filetype=,
+&trackparam
+  trkrinfo%feature_type = 'midlat',
+  trkrinfo%genesis_flag = TRUE,
+  trkrinfo%detec_thresh = 0.,
+  trkrinfo%contint = 1.,
+  trkrinfo%startdate = '1994-01-01 00:00:00',
+  trkrinfo%output_freq = 1,
+  trkrinfo%westbd = 0.,
+  trkrinfo%eastbd = 0.,
+  trkrinfo%northbd = 0.,
+  trkrinfo%southbd = 0.,
 /
-&atcfinfo
-  atcfnum=81,
-  atcfname=,
-  atcfymdh=,
-  atcffreq=,
+
+&datafile
+  fileinfo%file_type = 'netcdf',
+  fileinfo%grid_type = 'global',
+  fileinfo%time_unit = 'seconds',
+  fileinfo%model_name = 'test',
+  fileinfo%model_startdate = '1994-01-01 00:00:00',
 /
-&trackerinfo
-  trkrinfo%westbd=,
-  trkrinfo%eastbd=,
-  trkrinfo%northbd=,
-  trkrinfo%southbd=,
-  trkrinfo%type=,
-  trkrinfo%mslpthresh=,
-  trkrinfo%choose_t2='y',
-  trkrinfo%mslpthresh2=,
-  trkrinfo%v850thresh=,
-  trkrinfo%gridtype='global',
-  trkrinfo%contint=,
-  trkrinfo%out_vit='y',
+
+&fields_length
+  numfield%fixcenter = 2,
+  numfield%advection = 1,
+  numfield%intensity = 1,
 /
-&phaseinfo
-  phaseflag='y',
-  phasescheme='both',
-  wcore_depth=,
+&fields_names
+  fname%detection = 'mslp',
+  fname%detection_lev = 0,
+  fname%fixcenter = 'vo500' 'vo850',
+  fname%fixcenter_lev = 500 850,
+  fname%adv_1stdim = 'u500',
+  fname%adv_2nddim = 'v500',
+  fname%adv_lev = 500,
+  fname%adv_factor = 1,
+  fname%intensity = 'z500',
+  fname%intensity_lev = 500,
 /
-&structinfo
-  structflag='y',
-  ikeflag='n',
-/
-&fnameinfo
-  gmodname='gmodname',
-  rundescr='rundescr',
-  atcfdescr='atcfdescr',
-/
-&waitinfo
-  use_waitfor='n',
-/
+
 &verbose
-   verb=,
-/
+   verb = 3,
+/   
