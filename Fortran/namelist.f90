@@ -11,13 +11,15 @@
 !   Are ERR/END needed in read statement? -> the program stops if an error occured and err/end not specified
 !   Create a subroutine writing the namelist ?? --> do it rather with R
 !   write test / print_namelist for namelist_tc module
+!   The boundaries domain can be -999.0
+!   To specify boundaries spanning accross the Greenwitch meridian: trkrinfo%westbd < 0
 
 ! CONTAINS :
 !   The modules which define extended namelists:
 !     - "namelist_tc", for tropical cyclones
 !         It includes a namelist "tc_type" and the subroutine read_nlists_tc
 ! 
-!   The module "namelist" for the reading of general parameters :
+!   The module "namelist_trk" for the reading of general parameters :
 !     It includes the namelists : "trackparam", "datafile", 
 !                                 "fields_names", "verbose"
 !                 the general subroutine "read_nlists"
@@ -111,9 +113,10 @@ module namelist_trk
   type trackparam  ! Define a new type for various tracker parmeters
     sequence
     
-    character*7   feature_type  ! 'tc', 'midlat', 'WD' or 'other' (more if needed)
+    character*7   type  ! 'tc', 'midlat', 'WD' or 'other' (more if needed)
     logical       genesis_flag  ! Flag for whether consider the formation of new low
-    real          detec_thresh !previously mslpthresh2, min mslp to be detected
+    character*3   detec_minmax  ! tell if looking for a 'min' or a 'max' in the detection field
+    real          detec_thresh  ! previously mslpthresh2, min mslp to be detected
     real          contint  ! Contour interval to be used for 
                            ! "midlat" or "tcgen" cases.  ?? not for tracking only   
                            ! what about different fixcenter field ?
@@ -169,18 +172,18 @@ module namelist_trk
   type fields_names
     sequence
     
-    character*8 detection
+    character*16 detection
     integer     detection_lev
         
-    character*8 :: fixcenter(20)
+    character*16 :: fixcenter(20)
     integer     :: fixcenter_lev(20)
     
-    character*8 :: adv_1stdim(20)
-    character*8 :: adv_2nddim(20)
+    character*16 :: adv_1stdim(20)
+    character*16 :: adv_2nddim(20)
     integer     :: adv_lev(20)
     integer     :: adv_factor(20)
     
-    character*8 :: intensity(20)
+    character*16 :: intensity(20)
     integer     :: intensity_lev(20)
 
   end type fields_names
@@ -212,17 +215,30 @@ module namelist_trk
 
     print *,' '
     print *,'General information read from the namelist :'
+    print *, ' '
     print *, 'trackparam'
-    print "(A15, A, A)", ' feature_type', ' : ', trkrinfo%feature_type
-    print "(A15, A, L1)", ' genesis_flag', ' : ', trkrinfo%genesis_flag
-    print "(A15, A, F20.10)", ' detec_thresh', ' : ', trkrinfo%detec_thresh
-    print "(A15, A, F20.10)", ' contint',      ' : ', trkrinfo%contint
-    print "(A15, A, A)", ' startdate',    ' : ', trkrinfo%startdate
-    print "(A15, A, I2)", ' output_freq',  ' : ', trkrinfo%output_freq
-    print "(A15, A, F8.5)", ' westbd',       ' : ', trkrinfo%westbd
-    print "(A15, A, F8.5)", ' eastbd',       ' : ', trkrinfo%eastbd
-    print "(A15, A, F8.5)", ' northbd',      ' : ', trkrinfo%northbd
-    print "(A15, A, F8.5)", ' southbd',      ' : ', trkrinfo%southbd
+    print "(A15, A, A)",      ' type', ' : ', &
+                                              trkrinfo%type
+    print "(A15, A, L1)",     ' genesis_flag', ' : ', &
+                                              trkrinfo%genesis_flag
+    print "(A15, A, A)",      ' detec_minmax', ' : ', &
+                                              trkrinfo%detec_minmax
+    print "(A15, A, F20.10)", ' detec_thresh', ' : ', &
+                                              trkrinfo%detec_thresh
+    print "(A15, A, F20.10)", ' contint',      ' : ', &
+                                              trkrinfo%contint
+    print "(A15, A, A)",      ' startdate',    ' : ', &
+                                              trkrinfo%startdate
+    print "(A15, A, I2)",     ' output_freq',  ' : ', &
+                                              trkrinfo%output_freq
+    print "(A15, A, F8.3)",   ' westbd',       ' : ', &
+                                              trkrinfo%westbd
+    print "(A15, A, F8.3)",   ' eastbd',       ' : ', &
+                                              trkrinfo%eastbd
+    print "(A15, A, F8.3)",   ' northbd',      ' : ', &
+                                              trkrinfo%northbd
+    print "(A15, A, F8.3)",   ' southbd',      ' : ', & 
+                                              trkrinfo%southbd
       
     print *, ' '    
         
@@ -248,25 +264,25 @@ module namelist_trk
     print *, ' '
       
     print *, 'fields_names'
-    print "(A15, A, A)", ' detection',        ' :' , &
+    print "(A15, A, A10)", ' detection',       ' : ' , &
                               fname%detection
-    print "(A15, A, I6)", ' detection_lev',   ' : ', &
+    print "(A15, A, I10)", ' detection_lev',   ' : ', &
                               fname%detection_lev
-    print "(A15, A, 20A)", ' fixcenter',      ' : ', &
+    print "(A15, A, 20A10)", ' fixcenter',     ' : ', &
                               fname%fixcenter(1:numfield%fixcenter)
-    print "(A15, A, 20I6)", ' fixcenter_lev', ' : ', &
+    print "(A15, A, 20I10)", ' fixcenter_lev', ' : ', &
                               fname%fixcenter_lev(1:numfield%fixcenter)
-    print "(A15, A, 20A)", ' adv_1stdim',     ' : ', &
+    print "(A15, A, 20A10)", ' adv_1stdim',    ' : ', &
                               fname%adv_1stdim(1:numfield%advection)
-    print "(A15, A, 20A)", ' adv_2nddim',     ' : ', &
+    print "(A15, A, 20A10)", ' adv_2nddim',    ' : ', &
                               fname%adv_2nddim(1:numfield%advection)
-    print "(A15, A, 20I6)", ' adv_lev',       ' : ', &
+    print "(A15, A, 20I10)", ' adv_lev',       ' : ', &
                               fname%adv_lev(1:numfield%advection)
-    print "(A15, A, 20I2)", ' adv_factor',    ' : ', &
+    print "(A15, A, 20I10)", ' adv_factor',    ' : ', &
                               fname%adv_factor(1:numfield%advection)
-    print "(A15, A, 20A)", ' intensity',      ' : ', &
+    print "(A15, A, 20A10)", ' intensity',     ' : ', &
                               fname%intensity(1:numfield%intensity)
-    print "(A15, A, 20I6)", ' intensity_lev', ' : ', &
+    print "(A15, A, 20I10)", ' intensity_lev', ' : ', &
                               fname%intensity_lev(1:numfield%intensity)
                               
     print *, ' '
@@ -357,7 +373,12 @@ module namelist_trk
     endif
 
  
-   
+    if ((trkrinfo%detec_minmax /= 'min') .and. &
+        (trkrinfo%detec_minmax /= 'max')) then
+      err_nl = .TRUE.
+      print *, 'trkrinfo%detec_minmax'
+    endif
+    
     if (trkrinfo%output_freq .le. 0) then
       err_nl = .TRUE.
       print *, 'trkrinfo%output_freq'
@@ -368,25 +389,38 @@ module namelist_trk
       print *, 'trkrinfo%northbd'
     endif
 
-    if (trkrinfo%southbd .lt. -90.) then
+    if ((trkrinfo%southbd .lt. -90.) .and. &
+        (trkrinfo%southbd .ge. -998.)) then
       err_nl = .TRUE.
       print *, 'trkrinfo%southbd'
     endif
+
+    if (trkrinfo%southbd .gt. trkrinfo%northbd) then
+      err_nl = .TRUE.
+      print *, 'trkrinfo%southbd > trkrinfo%northbd'
+    endif
     
-    if (trkrinfo%westbd .lt. -360.) then
+    if ((trkrinfo%westbd .lt. -360.) .and. &
+       (trkrinfo%westbd .ge. -998.)) then
       err_nl = .TRUE.
       print *, 'trkrinfo%westbd'
     endif
 
-    if (trkrinfo%eastbd .gt. 360.) then
+    if (trkrinfo%eastbd .gt. 360. .or. (trkrinfo%eastbd .lt. 0 .and. &
+       trkrinfo%eastbd .ge. -998.)) then
       err_nl = .TRUE.
       print *, 'trkrinfo%eastbd'
     endif
     
     if (trkrinfo%eastbd - trkrinfo%westbd .gt. 360.) then
       err_nl = .TRUE.
-      print *, 'trkrinfo%eastbd - trkrinfo%westbd'
+      print *, 'trkrinfo%eastbd - trkrinfo%westbd > 360'
     endif    
+
+    if (trkrinfo%westbd .gt. trkrinfo%eastbd) then
+      err_nl = .TRUE.
+      print *, 'trkrinfo%westbd > trkrinfo%eastbd'
+    endif
         
     if ((numfield%fixcenter .lt. 0) .or. &
         (numfield%fixcenter .gt. 20)) then
@@ -421,9 +455,9 @@ module namelist_trk
   
     !-------------------------------------------------------------------
     ! for extended namelist, add the call here
-    ! it should depend on trkrinfo%feature_type
+    ! it should depend on trkrinfo%type
     !-------------------------------------------------------------------    
-    if (trkrinfo%feature_type == 'tc') then
+    if (trkrinfo%type == 'tc') then
       call read_nlists_tc(8, verb)
     endif
     

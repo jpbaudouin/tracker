@@ -1,14 +1,15 @@
 &trackparam
-  trkrinfo%feature_type = 'midlat',
+  trkrinfo%type = 'midlat',
   trkrinfo%genesis_flag = TRUE,
+  trkrinfo%detec_minmax = 'min' !or 'max'
   trkrinfo%detec_thresh = 0.,
   trkrinfo%contint = 1.,
   trkrinfo%startdate = '1994-01-01 00:00:00',
   trkrinfo%output_freq = 1,
-  trkrinfo%westbd = 0.,
-  trkrinfo%eastbd = 0.,
-  trkrinfo%northbd = 0.,
-  trkrinfo%southbd = 0.,
+  trkrinfo%westbd = -10.,
+  trkrinfo%eastbd = 10., ! needs to be positive
+  trkrinfo%northbd = 60.,
+  trkrinfo%southbd = 50.,
 /
 
 &datafile

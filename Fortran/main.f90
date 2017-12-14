@@ -7,7 +7,10 @@
 !12-12-2017 1st Commit -> up to itsloop
 
 
+
+! call read_tcv_card not writen
 ! Add within the R code the possibility to compute vorticity from winds
+
 
 ! CONTAINS :
 !   The modules main with its subroutine trackmain
@@ -39,6 +42,8 @@ module main
 
     implicit none
     
+    logical beingTracked(max_object) ! previously stormswitch, true if a storm needs to be tracked
+    integer ilast_object ! index of the last storm being detected
      
     if (verb .ge. 2) then
       print *, 'Loading parameters and datafile'
@@ -55,16 +60,17 @@ module main
     ! The time steps
     call readts
          
-    ! The previously tracked storms
-    call read_tcv_card ! I think it should be merged with read_gen_vitals
+    ! The previously tracked objects
+    call read_tcv_card(ilast_object) ! I think it should be merged with read_gen_vitals
           ! Only the naming of the storm is different, leading to one more column
           ! Add also a more simple syntax Name/lat/lon/...
-          ! Merge with sort_storms_by_pressure -> ~ sort_features_by_intensity
-          ! and add an option no_sort in R when user provide tracks of previous feature
+          ! Merge with sort_storms_by_pressure -> ~ sort_objects_by_intensity  ??
+          ! and add an option no_sort in R when user provide tracks of previous object ??
+          ! need to update ilast_object, either 0 or the number of object in the card
     To be done coding the subroutine writing the tcv_card
 
     ! Loading datafile
-    call open_datafile
+    call open_file
     call getgridinfo
     
     
@@ -123,49 +129,38 @@ module main
     
     
       call getdata(ts_tim(its))
-
-    !Computing Vorticity if needed
-      call subtract_cor
-      call rvcal
-    ! 
-    
-    ifhloop: ifh = 1,ifhmax !loop on the time steps
-
+      
+?! I think I need to first detect the next positions of the tracked object and to fill mask_out accordingly, before calling first_ges_center
       if (trkrinfo%genflag == 'y') then !change in namelist
-        call first_ges_center
+        call first_ges_center(ilast_object)
       endif
+
+      call sort_object ???
       
-      feature_loop: sl_counter = 1,max_feature !loop on all the feature detected so far
+            
+      object_loop: sl_counter = 1,ilast_object !loop on all the object detected so far
       
-        select case (stormswitch(sl_counter)) !feature status:
-          ! 1: under tracking; 2: track has ended; 3: free slots
-          ! maybe only one case require action
-        
-        case(1) !under tracking
-        
+        if (beingTracked(sl_counter)) then
           ! Compute some KR:
            call find_maxmin !for different field
            call fixcenter
            call check_closed_contour
           
-          ! In the meanwhile, test if the feature is valid 
+          ! In the meanwhile, test if the object is valid 
           ! if not, the tracking should be ended (stormswitch(sl_counter) = 2)
           ! if yes, continue with further analysis
           
-          ! part of it depends on the feature type
+          ! part of it depends on the object type
           
           call output...
           
           call get_next_ges
-          
-        case(2) !GFDL write some output, what for?
-        
-        case(3) ! Nothing
+
         
       
-      enddo feature_loop
+      enddo object_loop
     
-    enddo ifhloop
+    enddo itsloop
 
     call baclose
     !call w3tage
