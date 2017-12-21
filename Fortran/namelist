@@ -1,7 +1,6 @@
 &trackparam
   trkrinfo%type = 'midlat',
   trkrinfo%genesis_flag = TRUE,
-  trkrinfo%detec_minmax = 'min' !or 'max'
   trkrinfo%detec_thresh = 0.,
   trkrinfo%contint = 1.,
   trkrinfo%startdate = '1994-01-01 00:00:00',
@@ -10,6 +9,7 @@
   trkrinfo%eastbd = 10., ! needs to be positive
   trkrinfo%northbd = 60.,
   trkrinfo%southbd = 50.,
+  trkrinfo%rad     = 100., ! in km
 /
 
 &datafile
@@ -28,16 +28,19 @@
 &fields_names
   fname%detection = 'mslp',
   fname%detection_lev = 0,
+  fname%detec_minmax = 'min',
   fname%fixcenter = 'vo500' 'vo850',
   fname%fixcenter_lev = 500 850,
+  fname%fc_minmax = 'max' 'max',
   fname%adv_1stdim = 'u500',
   fname%adv_2nddim = 'v500',
   fname%adv_lev = 500,
   fname%adv_factor = 1,
   fname%intensity = 'z500',
   fname%intensity_lev = 500,
+  fname%int_minmax = 'min',
 /
 
 &verbose
-   verb = 3,
+  verb = 3,
 /   

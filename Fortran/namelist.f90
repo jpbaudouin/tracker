@@ -6,6 +6,8 @@
 !25-10-2017 Creation
 !29-11-2017 Working version
 !12-12-2017 1st Commit
+!18-12-2017 update namelist with minmaxs and rad
+!21-12-2017 2nd commit -> add the minmaxs
 
 ! RQ for further developments:
 !   Are ERR/END needed in read statement? -> the program stops if an error occured and err/end not specified
@@ -115,7 +117,6 @@ module namelist_trk
     
     character*7   type  ! 'tc', 'midlat', 'WD' or 'other' (more if needed)
     logical       genesis_flag  ! Flag for whether consider the formation of new low
-    character*3   detec_minmax  ! tell if looking for a 'min' or a 'max' in the detection field
     real          detec_thresh  ! previously mslpthresh2, min mslp to be detected
     real          contint  ! Contour interval to be used for 
                            ! "midlat" or "tcgen" cases.  ?? not for tracking only   
@@ -130,7 +131,8 @@ module namelist_trk
     real          westbd  ! Western boundary of search area
     real          eastbd  ! Eastern boundary of search area
     real          northbd ! Northern boundary of search area
-    real          southbd ! Southern boundary of search area
+    real          southbd ! Southern boundary of search area.
+    real          rad     ! characteristic radius of the objects
 
 !??  logical     want_oci ! calculate outermost closed isobar
 !??  character*1 out_vit  ! Flag for whether to write out vitals, always yes ??
@@ -173,18 +175,21 @@ module namelist_trk
     sequence
     
     character*16 detection
-    integer     detection_lev
+    integer      detection_lev
+    character*3  detec_minmax
         
-    character*16 :: fixcenter(20)
-    integer     :: fixcenter_lev(20)
+    character*16 fixcenter(20)
+    integer      fixcenter_lev(20)
+    character*3  fc_minmax(20)
     
-    character*16 :: adv_1stdim(20)
-    character*16 :: adv_2nddim(20)
-    integer     :: adv_lev(20)
-    integer     :: adv_factor(20)
+    character*16 adv_1stdim(20)
+    character*16 adv_2nddim(20)
+    integer      adv_lev(20)
+    integer      adv_factor(20)
     
-    character*16 :: intensity(20)
-    integer     :: intensity_lev(20)
+    character*16 intensity(20)
+    integer      intensity_lev(20)
+    character*3  int_minmax(20)
 
   end type fields_names
   
@@ -221,8 +226,6 @@ module namelist_trk
                                               trkrinfo%type
     print "(A15, A, L1)",     ' genesis_flag', ' : ', &
                                               trkrinfo%genesis_flag
-    print "(A15, A, A)",      ' detec_minmax', ' : ', &
-                                              trkrinfo%detec_minmax
     print "(A15, A, F20.10)", ' detec_thresh', ' : ', &
                                               trkrinfo%detec_thresh
     print "(A15, A, F20.10)", ' contint',      ' : ', &
@@ -239,6 +242,8 @@ module namelist_trk
                                               trkrinfo%northbd
     print "(A15, A, F8.3)",   ' southbd',      ' : ', & 
                                               trkrinfo%southbd
+    print "(A15, A, F8.3)",   ' rad',          ' : ', &
+                                              trkrinfo%rad
       
     print *, ' '    
         
@@ -268,10 +273,14 @@ module namelist_trk
                               fname%detection
     print "(A15, A, I10)", ' detection_lev',   ' : ', &
                               fname%detection_lev
+    print "(A15, A, A)",   ' detec_minmax',    ' : ', &
+                              fname%detec_minmax
     print "(A15, A, 20A10)", ' fixcenter',     ' : ', &
                               fname%fixcenter(1:numfield%fixcenter)
     print "(A15, A, 20I10)", ' fixcenter_lev', ' : ', &
                               fname%fixcenter_lev(1:numfield%fixcenter)
+    print "(A15, A, 20A)",   ' fc_minmax',    ' : ', &
+                              fname%fc_minmax(1:numfield%fixcenter)
     print "(A15, A, 20A10)", ' adv_1stdim',    ' : ', &
                               fname%adv_1stdim(1:numfield%advection)
     print "(A15, A, 20A10)", ' adv_2nddim',    ' : ', &
@@ -284,6 +293,8 @@ module namelist_trk
                               fname%intensity(1:numfield%intensity)
     print "(A15, A, 20I10)", ' intensity_lev', ' : ', &
                               fname%intensity_lev(1:numfield%intensity)
+    print "(A15, A, 20A)",   ' int_minmax',    ' : ', &
+                              fname%int_minmax(1:numfield%intensity)
                               
     print *, ' '
       
@@ -372,13 +383,6 @@ module namelist_trk
       print *, ''
     endif
 
- 
-    if ((trkrinfo%detec_minmax /= 'min') .and. &
-        (trkrinfo%detec_minmax /= 'max')) then
-      err_nl = .TRUE.
-      print *, 'trkrinfo%detec_minmax'
-    endif
-    
     if (trkrinfo%output_freq .le. 0) then
       err_nl = .TRUE.
       print *, 'trkrinfo%output_freq'
@@ -440,7 +444,26 @@ module namelist_trk
       print *, 'numfield%intensity'
     endif
 
-    
+
+    if ((fname%detec_minmax /= 'min') .and. &
+        (fname%detec_minmax /= 'max')) then
+      err_nl = .TRUE.
+      print *, 'fname%detec_minmax'
+    endif
+
+    if ((fname%fc_minmax /= 'min') .and. &
+        (fname%fc_minmax /= 'max')) then
+      err_nl = .TRUE.
+      print *, 'fname%fc_minmax'
+    endif
+
+    if ((fname%int_minmax /= 'min') .and. &
+        (fname%int_minmax /= 'max')) then
+      err_nl = .TRUE.
+      print *, 'fname%int_minmax'
+    endif
+
+
     if (err_nl) then
       print *, '!!! ERROR 101 in reading namelist :'
       print *, 'The variables above are wrong, see what has been read:'  
@@ -452,7 +475,7 @@ module namelist_trk
       call print_namelist
     endif
 
-  
+
     !-------------------------------------------------------------------
     ! for extended namelist, add the call here
     ! it should depend on trkrinfo%type
