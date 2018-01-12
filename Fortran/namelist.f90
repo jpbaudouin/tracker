@@ -8,6 +8,7 @@
 !12-12-2017 1st Commit
 !18-12-2017 update namelist with minmaxs and rad
 !21-12-2017 2nd commit -> add the minmaxs
+!12-01-2018 3rt commit -> adding trkrinfo%run_name
 
 ! RQ for further developments:
 !   Are ERR/END needed in read statement? -> the program stops if an error occured and err/end not specified
@@ -133,6 +134,7 @@ module namelist_trk
     real          northbd ! Northern boundary of search area
     real          southbd ! Southern boundary of search area.
     real          rad     ! characteristic radius of the objects
+    character*30  run_name! name of the run
 
 !??  logical     want_oci ! calculate outermost closed isobar
 !??  character*1 out_vit  ! Flag for whether to write out vitals, always yes ??
@@ -151,7 +153,7 @@ module namelist_trk
                     ! now 'seconds', 'minutes', 'hours', 'days', 'months', 'years'.
                     ! and also used to caracterise the unit of fort.15
 
-    character*4   model_name ! previously atcfname (ATCF Name of model (GFSO for GFS...), gmodname ?)
+    character*30  model_name ! previously atcfname (ATCF Name of model (GFSO for GFS...), gmodname ?)
     ! also used for specific parametrisation of hurricane tracking
 !??  integer     model_id  ! prevously 'model', integer identifier for model data used (used in get_data_grib only, how useful?) 
     character*19  model_startdate ! previously atcfymdh  used in output : YYYY-MM-DD hh:mm:ss
@@ -244,6 +246,8 @@ module namelist_trk
                                               trkrinfo%southbd
     print "(A15, A, F8.3)",   ' rad',          ' : ', &
                                               trkrinfo%rad
+    print "(A15, A, A)",      ' run_name',      ' : ', &
+                                              trkrinfo%run_name
       
     print *, ' '    
         
@@ -451,14 +455,14 @@ module namelist_trk
       print *, 'fname%detec_minmax'
     endif
 
-    if ((fname%fc_minmax /= 'min') .and. &
-        (fname%fc_minmax /= 'max')) then
+    if (any((fname%fc_minmax /= 'min') .and. &
+            (fname%fc_minmax /= 'max'))) then
       err_nl = .TRUE.
       print *, 'fname%fc_minmax'
     endif
 
-    if ((fname%int_minmax /= 'min') .and. &
-        (fname%int_minmax /= 'max')) then
+    if (any((fname%int_minmax /= 'min') .and. &
+            (fname%int_minmax /= 'max'))) then
       err_nl = .TRUE.
       print *, 'fname%int_minmax'
     endif

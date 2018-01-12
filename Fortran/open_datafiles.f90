@@ -5,6 +5,7 @@
 
 !25-10-2017 Creation
 !12-12-2017 1st Commit -> 1st version
+!12-01-2018 2nd commit -> values in fort.15 can't be negative
 
 ! RQ for further developments:
 ! Is it possible that a the time dimension is not oredered in a netcdf?
@@ -1157,8 +1158,8 @@ module time_step
                    
         if (startdate /= trkrinfo%startdate) then
           print *, ""
-          print *, "!!! ERROR 114: The startdate in the netcdf file"
-          print *, "!!! in the namelist"   
+          print *, "!!! ERROR 114: The startdate in the netcdf file does't"
+          print *, "!!! correspond to the one provided in the namelist"   
           STOP 114
         endif
       
@@ -1188,13 +1189,14 @@ module time_step
     
     
     do i = 1,nts
-      if (abs(values(i)) < 9999) then
+      if (values(i) < 9999 .and. values(i) >= 0) then
         ts_num(i) = i
         ts_tim(i) = values(i)
       else
-        print *,''
-        print *,'!!! ERROR 117 when filling fort.15'
-        print *,'!!! one of the time value exceed the format'
+        print *, ""
+        print *, "!!! ERROR 117 when filling fort.15"
+        print *, "!!! one of the time value exceed the format: "
+        print *, "!!! i=", i, "values(i)=", values(i)
         STOP 117
       endif
     enddo
