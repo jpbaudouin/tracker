@@ -12,6 +12,7 @@
 !12-01-2018 4th commit -> correction in get_neighbours
 !                         writing check_contour, find_minmax and fixcenter help
 !                         finishing first_ges_center
+!15-01-2018 5th commit -> adding get_speed_dir and adding speed/direction in output (first_ges_center)
 
 
 
@@ -199,7 +200,7 @@ module core_tracker
   real, parameter :: dtr = 4. * atan(1.)/180.0 !pi/180
   integer, parameter :: max_object = 9999
   
-  real, save, allocatable :: prevlon(:,:), prevlat(:,:)
+  real, save, allocatable :: prevlon(:), prevlat(:)
   logical, save, allocatable :: masked_out(:,:)
  
   
@@ -1127,7 +1128,7 @@ module core_tracker
     ! First, a mean of all the centers are done
     ! Then, it's recalculated by giving more weight to centers closer 
     !   to the previously calculated mean position
-    ! If centers appeared to be at more than rad of the first mean
+    ! If some centers appeared to be at more than rad of the first mean
     !   position, they are not considered for the second one
     ! Note: we take a simple lon/lat average, without considering
     !   the Earth curvature
@@ -1308,9 +1309,187 @@ module core_tracker
  
   
   end subroutine
+
+
+
   
+  !---------------------------------------------------------------------------------
+  !----- Subroutine that compute the movement speed and direction of an object -----
+  !---------------------------------------------------------------------------------  
+  subroutine get_speed_dir(iobj, its, fixlon, fixlat, mask_object, &
+                              first_detection, speed, direction)  
+  ! 
   
+    implicit none
+    
+    integer, intent(in) :: iobj, its
+    real, intent(in) :: fixlon, fixlat
+    logical, intent(in) :: first_detection, mask_object(:,:)
+    
+    real, intent(out) :: speed, direction
+    
+    
+    real dist, degree ! in calcdist
+    real extrapoled_direction, extrapoled_speed, dt
+    logical extrapol ! true if the extrapolation was computed
+    real wind_speed, wind_direction
+    real wind_speed_ij, wind_u, wind_u_ij, wind_v, wind_v_ij
+    integer n_ij ! number of selected points to compute the mean wind
+    real wts, wt ! weightening for the mean wind
+    integer i, j, iadv
+    
+    
+   
+  !------------------------------------
+  !-- Method 1: Linear extrapolation --
+  !------------------------------------
+  ! First, just do a simple linear extrapolation from the previous fix
+  !   position through the current fix position. 
+  ! Doesn't work for newly detected low
+
+     
+    if (.not. first_detection) then ! the object previous position is known
+      if (prevlat(iobj) >= -90 .and. prevlon(iobj) >= 0) then ! To be sure they are initialised
+      
+        if (its == 1) then
+          dt = ts_tim(1) - ts_tim_0
+        else
+          dt = ts_tim(its) - ts_tim(its-1)
+        endif
+        
+        call calcdist(prevlat(iobj), prevlon(iobj), fixlat, fixlon, &
+                dist, degree)
+                
+        extrapoled_direction = degree
+        extrapoled_speed = dist / dt
+        extrapol = .true.
+        
+      else
+        if (verb >= 1) then 
+          print *, ""
+          print *, "WARNING in get_speed_dir"
+          print *, "the previous latitude or longitude of an object is"
+          print *, "not initialised while it is not its first detection"
+          print *, "prevlat: ", prevlat(iobj)
+          print *, "prevlon: ", prevlon(iobj)
+        endif
+        extrapol = .false.
+        
+      endif
+      extrapol = .false.
+    endif
+
+
+    
+  !------------------------------
+  !-- Method 2: Wind advection --
+  !------------------------------
+  ! We take an average of the wind in the area influenced by the object
+  !   and at less than rad from the center.
+  ! More weights are given to the wind closer to the center.
+  ! If more than one field is provided to compute the advection, we take
+  !   an average of it
   
+    wind_speed = 0
+    wind_u = 0
+    wind_v = 0
+    n_ij = 0
+  
+    do i=1,imax
+      do j=1,jmax
+        if (mask_object(i,j)) then
+        
+          call calcdist(glon(i), glat(j), fixlat, fixlon, &
+                dist, degree)
+
+          if (dist < trkrinfo%rad) then
+
+            wind_speed_ij = 0
+            wind_u_ij = 0
+            wind_v_ij = 0
+            n_ij = n_ij + 1
+            
+            do iadv=1,numfield%advection
+              wind_speed_ij = wind_speed_ij + sqrt(data_u(i,j,iadv)**2 &
+                                                  + data_v(i,j,iadv)**2)
+              wind_u_ij = wind_u_ij + data_u(i,j,iadv)
+              wind_v_ij = wind_v_ij + data_v(i,j,iadv)
+            enddo
+
+            wt = ((dist-trkrinfo%rad)/trkrinfo%rad)**2
+            wts = wts + wt
+            wind_speed = wind_speed + wind_speed_ij/numfield%advection*wt
+            wind_u = wind_u + wind_u_ij/numfield%advection*wt
+            wind_v = wind_v + wind_v_ij/numfield%advection*wt
+            
+
+          endif
+        endif
+        
+      enddo
+    enddo
+    
+    wind_speed = wind_speed / n_ij
+
+    ! 360 is the North, 0 means no wind
+    if (wind_u == 0.0) then
+      if (wind_v == 0.0) then 
+        wind_direction = 0.0
+      else if (wind_v > 0) then
+        wind_direction = 360.0
+      else if (wind_v < 0) then
+        wind_direction = 180.0
+      endif
+    else if (wind_u > 0.0) then
+      if (wind_v == 0.0) then 
+        wind_direction = 90.0
+      else 
+        wind_direction = 90. - atan(wind_v/wind_u)  / dtr
+      endif
+    else if (wind_u < 0.0) then
+      if (wind_v == 0.0) then 
+        wind_direction = 270.0
+      else
+        wind_direction = 270. - atan(wind_v/wind_u) / dtr
+      endif
+    endif         
+    
+    
+  !-----------------------------
+  !-- average the two methods --
+  !-----------------------------
+  
+    if(extrapol) then
+      speed = (wind_speed + extrapoled_speed)/2
+      direction= (wind_direction + extrapoled_direction)/2
+     else
+      speed = wind_speed
+      direction = wind_direction
+    endif
+    
+    if ( verb .ge. 3 ) then
+      print *, ""
+      print *, "Speed and direction have calculated for the object: ", &
+                names_obj(iobj)
+      print *, "wind direction: ", wind_direction
+      print *, "wind_speed: ", wind_speed
+      if (extrapol) then
+        print *, "extrapoled direction: ", extrapoled_direction
+        print *, "extrapoled speed: ", extrapoled_speed
+      else
+        print *, "No extrapolation was computed"
+      endif
+      print *, "therefore,"
+      print *, "object direction (in °): ", direction
+      print *, "object speed (in km/", trim(fileinfo%time_unit), &
+                  "): ", speed
+    endif
+                  
+      
+
+  end subroutine
+
+
   
   !---------------------------------------------------------------------------------
   !----- Subroutine searching for new local min / max in the "detection" field -----
@@ -1342,7 +1521,7 @@ module core_tracker
     logical mask_detec(imax,jmax), mask_object(imax,jmax)
     logical mask_object_max(imax,jmax), mask_object_min(imax,jmax)
     real contour, minmax_val, contour_max, rcontour_max
-    real fixlon, fixlat
+    real fixlon, fixlat, speed, direction
     real vals_fc(numfield%fixcenter), vals_int(numfield%intensity)
     integer ccret, ptx(2), ilast_object_old, iint
     integer ptc_i(numfield%intensity), ptc_j(numfield%intensity) ! not used
@@ -1541,8 +1720,8 @@ module core_tracker
 
       ! name object & save the center's coordinates
       call newobject_name(its, ilast_object, fixlon, fixlat)
-      prevlon(its, ilast_object) = fixlon
-      prevlat(its, ilast_object) = fixlat
+      prevlon(ilast_object) = fixlon
+      prevlat(ilast_object) = fixlat
 
 
       ! compute the minmax for the fields intensity
@@ -1551,12 +1730,16 @@ module core_tracker
                 fname%int_minmax(iint), ptc_i(iint), ptc_j(iint), &
                 clon(iint),clat(iint),vals_int(iint))
       enddo
+      
+      ! compute speed and direction from wind speed
+      call get_speed_dir(ilast_object, its, fixlon, fixlat, mask_object, &
+                           .true., speed, direction)
 
 
       ! write ouputs
       call default_output(ilast_object, its, fixlon, fixlat, &
                     minmax_val, contour_max, rcontour_max, &
-                    vals_fc, vals_int)
+                    vals_fc, vals_int, speed, direction)
 
 
       ! fill mask_detec with new false and masked_out with true

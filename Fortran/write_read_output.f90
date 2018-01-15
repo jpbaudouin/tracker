@@ -4,8 +4,12 @@
 
 
 !12-01-2018 Creation and 1st commit
+!15-01-2018 2nd commit -> adding speed and direction in oupput
+!                      -> removing file_default_output as a module variable
 
 
+!Note: speed and direction are useful when a new instance of the program
+!   is launched with previously tracked object
 
 ! CONTAINS :
 !   The module "read_write_output" with the subroutines:
@@ -28,8 +32,7 @@ module read_write_output
 
   implicit none
   
-  character(len=70), save :: file_default_output   ! "output_"// trim(fileinfo%model_name)//"_"// trim(trkrinfo%run_name)//".txt"
-  character*27, save, allocatable :: names_obj(:)
+  character*29, save, allocatable :: names_obj(:)
 
 
   contains
@@ -48,13 +51,14 @@ module read_write_output
   ! its     the timestep considered
   
   ! OUTPUT
-  ! date    the date of the timestep: yymmdd
+  ! date    the date of the timestep: yyyymmdd
   ! time    the time of the timestep: hhmmss
   
   implicit none
   
   integer, intent(in) :: its
-  character*6, intent(out) :: date, time
+  character*8, intent(out) :: date
+  character*6, intent(out) :: time
   
   integer y, m, d, h, mn, s, q
   character c(5)
@@ -149,7 +153,7 @@ module read_write_output
     
     
     ! write the outputs
-    write(date, "(3I2)")  y, m, d
+    write(date, "(I4, 2I2)")  y, m, d
     write(time, "(3I2)")  h, mn, s
     
     
@@ -166,8 +170,8 @@ module read_write_output
   subroutine newobject_name(its, iobj, lon, lat) 
   ! Each object have an identifier (an integer) to which is associate a
   !   name that will be print out in the output as well as in the user
-  !   messages. The name has the format yymmddhhmmss_lonc_latc, where
-  !   yymmddhhmmss is the start date and time of the object track, and
+  !   messages. The name has the format yyyymmddhhmmss_lonc_latc, where
+  !   yyyymmddhhmmss is the start date and time of the object track, and
   !   lonc, latc its coordinate. lon and lat are > 0, with the character
   !   "c" indicating the direction (W/E and N/S).
   ! NOTE: this function is only called in first_ges_center when a new 
@@ -184,7 +188,8 @@ module read_write_output
     integer, intent(in) :: its, iobj
     real,    intent(in) :: lon, lat
     
-    character*6  date, time
+    character*8  date
+    character*6  time
     character    lonc, latc
     integer      lat2, lon2
     character*27 object_name
@@ -223,7 +228,7 @@ module read_write_output
   !-- create the new string --
   !---------------------------
 
-    write(object_name, "(A6, A, A6, A, F5.2, A, A, F5.2, A)") date, &
+    write(object_name, "(A8, A, A6, A, F5.2, A, A, F5.2, A)") date, &
               "_", time, "_", lon2, lonc, "_", lat2, latc
           
           
@@ -247,7 +252,8 @@ module read_write_output
   !---------------------------------------------------------------------------------
   subroutine default_output(id_obj, its, lon, lat, &
                     minmax_detection, contour_max, rcontour_max, &
-                    minmaxs_fixcenter, minmaxs_intensity)
+                    minmaxs_fixcenter, minmaxs_intensity, speed, &
+                    direction)
                  
   ! Note: id_obj give the object's name through names_obj               
                  
@@ -255,26 +261,30 @@ module read_write_output
     implicit none
     
     integer, intent(in) :: id_obj, its
-    real,    intent(in) :: lon, lat, minmax_detection
+    real,    intent(in) :: lon, lat, minmax_detection, speed, direction
     real,    intent(in) :: minmaxs_fixcenter(:), minmaxs_intensity(:)
     real,    intent(in) :: contour_max, rcontour_max
   
     integer unit, i
-    character*6 date, time
-    character*200 header, obj_info
+    character*8 date
+    character*6 time
+    character*200 header, obj_info, file_default_output
 
 
     if ( verb .ge. 3 ) then
       print *, "printing the outputs"
     endif
     
-      
-    inquire(file=file_default_output, number=unit)
+    file_default_output = "output_"// trim(fileinfo%model_name)//"_"// &
+                            trim(trkrinfo%run_name)//".txt"
+    
+    
+    inquire(file=trim(file_default_output), number=unit)
     if (unit == -1) then
-      open(file=file_default_output, unit = 64)
+      open(file=trim(file_default_output), unit = 64)
 
 
-      header = "ID  , names                      , yymmdd, hhmmss, "// &
+      header = "ID  , names                      , yyyymmdd, hhmmss, "// &
                "lon    , lat     , "
 
       write(header, "(A, A7)") trim(header), fname%detection
@@ -287,7 +297,7 @@ module read_write_output
         write(header, "(A, A5, A)") trim(header), fname%intensity(i), ", "
       enddo
 
-      write(64) trim(header)
+      write(64) trim(header)//"speed  , dir    "
 
 
     endif  
@@ -298,7 +308,7 @@ module read_write_output
     
     write(unit) trim(obj_info)
     
-    write(obj_info, "(I4, A, A27, A, I0.8, A, I0.6, A, F7.2, A, " // &
+    write(obj_info, "(I4, A, A27, A, A8, A, A6, A, F7.2, A, " // &
                     "F6.2, A, F7.2, A, F5.0, A, F7.0, A)") &
                       id_obj, ", ", names_obj(id_obj), ", ", date, &
                       ", ", time, ", ", lon, ", ", lat, ", ", &
@@ -314,6 +324,10 @@ module read_write_output
       write(obj_info, "(A, f5.0, A)") trim(obj_info), &
                                         minmaxs_intensity(i), ", "
     enddo
+    
+    
+    write(64, "(A, F7.2, A, F7.2)") trim(obj_info), speed, ", ", &
+                                      direction
 
 
     flush(64)
