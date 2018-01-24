@@ -9,6 +9,7 @@
 !18-12-2017 update namelist with minmaxs and rad
 !21-12-2017 2nd commit -> add the minmaxs
 !12-01-2018 3rt commit -> adding trkrinfo%run_name
+!24-01-2018 2nd commit -> working version
 
 ! RQ for further developments:
 !   Are ERR/END needed in read statement? -> the program stops if an error occured and err/end not specified
@@ -23,10 +24,14 @@
 !         It includes a namelist "tc_type" and the subroutine read_nlists_tc
 ! 
 !   The module "namelist_trk" for the reading of general parameters :
-!     It includes the namelists : "trackparam", "datafile", 
-!                                 "fields_names", "verbose"
-!                 the general subroutine "read_nlists"
-!                 the subroutine print_namelist
+!     It includes the namelists :
+!         - trackparam
+!         - datafile
+!         - fields_names
+!         - verbose
+!     And the subroutines:
+!         - read_nlists
+!         - print_namelist
 
 
 
@@ -283,7 +288,7 @@ module namelist_trk
                               fname%fixcenter(1:numfield%fixcenter)
     print "(A15, A, 20I10)", ' fixcenter_lev', ' : ', &
                               fname%fixcenter_lev(1:numfield%fixcenter)
-    print "(A15, A, 20A)",   ' fc_minmax',    ' : ', &
+    print "(A15, A, 20(A,1X))",   ' fc_minmax',    ' : ', &
                               fname%fc_minmax(1:numfield%fixcenter)
     print "(A15, A, 20A10)", ' adv_1stdim',    ' : ', &
                               fname%adv_1stdim(1:numfield%advection)
@@ -297,7 +302,7 @@ module namelist_trk
                               fname%intensity(1:numfield%intensity)
     print "(A15, A, 20I10)", ' intensity_lev', ' : ', &
                               fname%intensity_lev(1:numfield%intensity)
-    print "(A15, A, 20A)",   ' int_minmax',    ' : ', &
+    print "(A15, A, 20(A,1X))",   ' int_minmax',    ' : ', &
                               fname%int_minmax(1:numfield%intensity)
                               
     print *, ' '
@@ -320,6 +325,7 @@ module namelist_trk
     integer iread
     character*5 c
     logical :: err_nl = .FALSE.
+    logical test(20)
         
     namelist/trackparam/trkrinfo
     namelist/datafile/fileinfo
@@ -455,14 +461,16 @@ module namelist_trk
       print *, 'fname%detec_minmax'
     endif
 
-    if (any((fname%fc_minmax /= 'min') .and. &
-            (fname%fc_minmax /= 'max'))) then
+    test = (fname%fc_minmax /= 'min') .and. (fname%fc_minmax /= 'max')
+    if ( (numfield%fixcenter == 1 .and. test(1)) .or. &
+        any(test(1:numfield%fixcenter)) ) then
       err_nl = .TRUE.
       print *, 'fname%fc_minmax'
     endif
-
-    if (any((fname%int_minmax /= 'min') .and. &
-            (fname%int_minmax /= 'max'))) then
+    
+    test = (fname%int_minmax /= 'min') .and. (fname%int_minmax /= 'max')
+    if (numfield%intensity == 1 .and. test(1) .or. &
+        any(test(1:numfield%intensity))) then
       err_nl = .TRUE.
       print *, 'fname%int_minmax'
     endif

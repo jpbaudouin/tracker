@@ -5,14 +5,15 @@
 
 !25-10-2017 Creation
 !12-12-2017 1st Commit -> pi, dtr
-!14-12-2017 2nd commit -> check_closed_contour, first_ges_center
+!14-12-2017 2nd commit -> check_contour, first_ges_center
 !21-12-2017 3rd commit -> module no_dependance, get_neighbours
 !                         get_ij_bounds, find_minmax, fixcenter
-!                         correction check_contour (check_closed_contour), first_ges_center
+!                         correction check_contour (check_contour), first_ges_center
 !12-01-2018 4th commit -> correction in get_neighbours
 !                         writing check_contour, find_minmax and fixcenter help
 !                         finishing first_ges_center
 !15-01-2018 5th commit -> adding get_speed_dir and adding speed/direction in output (first_ges_center)
+!24-01-2018 6th commit -> working version
 
 
 
@@ -23,30 +24,28 @@
 
 
 ! CONTAINS :
-!   The module no_dependance which includes subroutines without dependance 
-!   to parameters from other modules:
-!   - "get_neighbours", which returns a list of neighboring points around
-!       a central one
+!   The module "no_dependance" which includes subroutines without dependance :
+!       - get_neighbours(pt_i, pt_j, grid, imax, jmax, ptn, ptn_i, ptn_j)
+!       - qsort(x,ind,n)
 
-!   The module core_tracker with different parameters and the subroutines:
-!   - "get_ij_bounds", which reduces the array size for local analysis,
-!       by returning the indices of a subgrid which contains all the 
-!       points within a certain distance of a central one.
-!   - "check_contour", which test if a minimum closed contour exists
-!       around a point, and if so, what is the largest contour, its mean
-!       distance to that point, what is the area it includes, and what
-!       is the largest area influenced by the new object.
-!   - "find_minmax", which outputs a mininimum or maximum near a given 
-!       point from a given field
-!   - "fixcenter", which gives a better estimate of the center of an
-!       object given the minmax that can be found in data_fixcenter
-!   - "first_ges_center", which detect new objects
+!   The module "core_tracker" with few parameters and the subroutines:
+!       - get_ij_bounds (geslon, geslat, rad, ibeg, jbeg, iend, jend, ret)
+!       - check_contour (ptx_i, ptx_j, fxy, cminmax, contour_min, 
+!                        forced, mask_object, mask_object_cc, 
+!                        contour_max, rcontour_max,ret)
+!       - find_minmax(geslon, geslat, fxy, minmax, ptc_i, ptc_j, 
+!                     clon, clat, cval, found)
+!       - fixcenter (pt_i, pt_j, mask_object_max, mask_object_min,
+!                    mask_object, fix_lon, fix_lat, fixvals,
+!                    contour_max, rcontour_max)
+!       - get_speed_dir(iobj, its, fixlon, fixlat, mask_object, first_detection)  
+!       - first_ges_center (its, ilast_object)
 
 
 
 
 !###########################################################################################
-!##################### Module including subrtoutine without dependances ####################
+!#################### Module including subrtoutines without dependances ####################
 !###########################################################################################
 !-----------------------------------------------------------------------------------
 
@@ -89,7 +88,7 @@ module no_dependance
     implicit none
   
     integer, intent(in)  :: pt_i, pt_j, imax, jmax
-    character*30, intent(in) :: grid
+    character*8, intent(in) :: grid
     integer, intent(out) :: ptn, ptn_i(8), ptn_j(8)
   
     integer pt_ip1, pt_im1, pt_jp1, pt_jm1
@@ -175,11 +174,216 @@ module no_dependance
     endif
              
   end subroutine
+
+
+  !---------------------------------------------------------------------------------
+  !-------------------- Subroutine sorting values in a vector ----------------------
+  !---------------------------------------------------------------------------------
+  SUBROUTINE qsort(x,ind,n)
+
+  ! Code converted using TO_F90 by Alan Miller
+  ! Date: 2002-12-18  Time: 11:55:47
+  ! ********************************************************************
+  ! 
+  !                                                         ROBERT RENKA
+  !                                                 OAK RIDGE NATL. LAB.
+  ! 
+  ! THIS SUBROUTINE USES AN ORDER N*LOG(N) QUICK SORT TO SORT A REAL 
+  !   (dp) ARRAY X INTO INCREASING ORDER.  THE ALGORITHM IS AS FOLLOWS.  
+  !   IND IS INITIALIZED TO THE ORDERED SEQUENCE OF INDICES 1,...,N, AND 
+  !   ALL INTERCHANGES ARE APPLIED TO IND.  X IS DIVIDED INTO TWO 
+  !   PORTIONS BY PICKING A CENTRAL ELEMENT T.  THE FIRST AND LAST 
+  !   ELEMENTS ARE COMPARED WITH T, AND INTERCHANGES ARE APPLIED AS 
+  !   NECESSARY SO THAT THE THREE VALUES ARE IN ASCENDING ORDER.  
+  !   INTERCHANGES ARE THEN APPLIED SO THAT ALL ELEMENTS GREATER THAN T
+  !   ARE IN THE UPPER PORTION OF THE ARRAY AND ALL ELEMENTS LESS THAN T
+  !   ARE IN THE LOWER PORTION.  THE UPPER AND LOWER INDICES OF ONE OF
+  !   THE PORTIONS ARE SAVED IN LOCAL ARRAYS, AND THE PROCESS IS 
+  !   REPEATED ITERATIVELY ON THE OTHER PORTION.  WHEN A PORTION IS
+  !   COMPLETELY SORTED, THE PROCESS BEGINS AGAIN BY RETRIEVING THE 
+  !   INDICES BOUNDING ANOTHER UNSORTED PORTION.
+  
+
+    ! INPUT 
+    ! N     LENGTH OF THE ARRAY X.
+    ! X     VECTOR OF LENGTH N TO BE SORTED.
+
+    ! OUTPUT 
+    ! IND   SEQUENCE OF INDICES 1,...,N PERMUTED IN THE SAME FASHION AS 
+    !         X WOULD BE. THE ORDERING ON X IS DEFINED BY Y(I) = X(IND(I))
+
+    ! NOTE: IU AND IL MUST BE DIMENSIONED >= LOG(N) WHERE LOG HAS BASE 2.
+  
     
+      IMPLICIT NONE
+      INTEGER, PARAMETER  :: dp = SELECTED_REAL_KIND(12, 60)
 
+      REAL, INTENT(IN)  :: x(n)
+      INTEGER, INTENT(OUT)   :: ind(n)
+      INTEGER, INTENT(IN)    :: n
+
+
+
+
+      INTEGER   :: iu(21), il(21)
+      INTEGER   :: m, i, j, k, l, ij, it, itt, indx
+      REAL      :: r
+      REAL (dp) :: t
+
+      ! LOCAL PARAMETERS -
+
+      ! IU,IL =  TEMPORARY STORAGE FOR THE UPPER AND LOWER
+      !            INDICES OF PORTIONS OF THE ARRAY X
+      ! M =      INDEX FOR IU AND IL
+      ! I,J =    LOWER AND UPPER INDICES OF A PORTION OF X
+      ! K,L =    INDICES IN THE RANGE I,...,J
+      ! IJ =     RANDOMLY CHOSEN INDEX BETWEEN I AND J
+      ! IT,ITT = TEMPORARY STORAGE FOR INTERCHANGES IN IND
+      ! INDX =   TEMPORARY INDEX FOR X
+      ! R =      PSEUDO RANDOM NUMBER FOR GENERATING IJ
+      ! T =      CENTRAL ELEMENT OF X
+
+      IF (n <= 0) RETURN
+
+      ! INITIALIZE IND, M, I, J, AND R
+
+      DO  i = 1, n
+        ind(i) = i
+      END DO
+      m = 1
+      i = 1
+      j = n
+      r = .375
+
+      ! TOP OF LOOP
+
+   20 IF (i >= j) GO TO 70
+      IF (r <= .5898437) THEN
+        r = r + .0390625
+      ELSE
+        r = r - .21875
+      END IF
+
+      ! INITIALIZE K
+
+   30 k = i
+
+      ! SELECT A CENTRAL ELEMENT OF X AND SAVE IT IN T
+
+      ij = i + r*(j-i)
+      it = ind(ij)
+      t = x(it)
+
+      ! IF THE FIRST ELEMENT OF THE ARRAY IS GREATER THAN T,
+      !   INTERCHANGE IT WITH T
+
+      indx = ind(i)
+      IF (x(indx) > t) THEN
+        ind(ij) = indx
+        ind(i) = it
+        it = indx
+        t = x(it)
+      END IF
+
+      ! INITIALIZE L
+
+      l = j
+
+      ! IF THE LAST ELEMENT OF THE ARRAY IS LESS THAN T,
+      !   INTERCHANGE IT WITH T
+      indx = ind(j)
+      IF (x(indx) >= t) GO TO 50
+      ind(ij) = indx
+      ind(j) = it
+      it = indx
+      t = x(it)
+
+      ! IF THE FIRST ELEMENT OF THE ARRAY IS GREATER THAN T,
+      !   INTERCHANGE IT WITH T
+
+      indx = ind(i)
+      IF (x(indx) <= t) GO TO 50
+      ind(ij) = indx
+      ind(i) = it
+      it = indx
+      t = x(it)
+      GO TO 50
+
+      ! INTERCHANGE ELEMENTS K AND L
+
+   40 itt = ind(l)
+      ind(l) = ind(k)
+      ind(k) = itt
+
+      ! FIND AN ELEMENT IN THE UPPER PART OF THE ARRAY WHICH IS
+      !   NOT LARGER THAN T
+
+   50 l = l - 1
+      indx = ind(l)
+      IF (x(indx) > t) GO TO 50
+
+      ! FIND AN ELEMENT IN THE LOWER PART OF THE ARRAY WHCIH IS NOT SMALLER THAN T
+
+   60 k = k + 1
+      indx = ind(k)
+      IF (x(indx) < t) GO TO 60
+
+      ! IF K <= L, INTERCHANGE ELEMENTS K AND L
+
+      IF (k <= l) GO TO 40
+
+      ! SAVE THE UPPER AND LOWER SUBSCRIPTS OF THE PORTION OF THE
+      !   ARRAY YET TO BE SORTED
+
+      IF (l-i > j-k) THEN
+        il(m) = i
+        iu(m) = l
+        i = k
+        m = m + 1
+        GO TO 80
+      END IF
+
+      il(m) = k
+      iu(m) = j
+      j = l
+      m = m + 1
+      GO TO 80
+
+
+      ! BEGIN AGAIN ON ANOTHER UNSORTED PORTION OF THE ARRAY
+
+   70 m = m - 1
+      IF (m == 0) RETURN
+      i = il(m)
+      j = iu(m)
+
+   80 IF (j-i >= 11) GO TO 30
+      IF (i == 1) GO TO 20
+      i = i - 1
+
+      ! SORT ELEMENTS I+1,...,J.  NOTE THAT 1 <= I < J AND J-I < 11.
+
+   90 i = i + 1
+      IF (i == j) GO TO 70
+      indx = ind(i+1)
+      t = x(indx)
+      it = indx
+      indx = ind(i)
+      IF (x(indx) <= t) GO TO 90
+      k = i
+
+  100 ind(k+1) = ind(k)
+      k = k - 1
+      indx = ind(k)
+      IF (t < x(indx)) GO TO 100
+
+      ind(k+1) = it
+      GO TO 90
+      END SUBROUTINE qsort
+  
+  
+  
 end module
-
-
 
 
 !###########################################################################################
@@ -192,16 +396,15 @@ module core_tracker
   
   use data_param
   use namelist_trk
-  use read_write_output
+  use write_read_output
+  use grid_projection
+  use no_dependance
 
   implicit none
   
-  real, parameter :: pi = 4. * atan(1.)
-  real, parameter :: dtr = 4. * atan(1.)/180.0 !pi/180
   integer, parameter :: max_object = 9999
-  
-  real, save, allocatable :: prevlon(:), prevlat(:)
   logical, save, allocatable :: masked_out(:,:)
+  logical beingTracked(max_object) ! previously stormswitch, true if a storm needs to be tracked
  
   
   contains
@@ -241,6 +444,7 @@ module core_tracker
   !           71  : rad is too small and the first point tested is 
   !                   already at a distance superior to rad
   !           72  : rad is likely too large, as all indexes along i are considered
+  !           Note: except if very high latitude, feature removed
   !           < 0 : In case of a regional grid, the distance between 
   !                   the edge and the central point is inferior to rad 
   !                 In that case, the edge of the subgrid is fixed to
@@ -250,7 +454,7 @@ module core_tracker
     implicit none
   
     real,    intent(in)  :: geslon, geslat, rad
-    integer, intent(out) :: ibeg, jbeg, iend, jend, ret
+    integer, intent(inout) :: ibeg, jbeg, iend, jend, ret
     integer fix_i, fix_j, ip, jp, i, j
     real dist, degrees
 
@@ -272,15 +476,16 @@ module core_tracker
         if (ip >= fix_i + imax/2 + 1) then
         ! it's about to loop around the earth and to get closer to gespoint
           iend = imax ! ibeg will be 1 in its loop
-          ret = 72
+          ! ret = 72
           exit
         else ! wrapping
           i = ip - imax
         endif
       endif
       
-      call calcdist(geslon,geslat,glon(i),geslat,dist,degrees)
-      
+      call calc_dist_dir(geslon, geslat, glon(i), geslat, .false., &
+                          dist, degrees)
+                               
       if (dist > rad) then      
         if (i == fix_i) then
           ret = 71
@@ -306,14 +511,15 @@ module core_tracker
         if (ip <= -(fix_i + imax/2 + 1)) then
         ! it's about to loop around the earth and to get closer to gespoint
           ibeg = 1 ! iend will be imax in its loop
-          ret = 72
+          !ret = 72
           exit
         else ! wrapping
           i = ip + imax
         endif
       endif
       
-      call calcdist(geslon,geslat,glon(i),geslat,dist,degrees)
+      call calc_dist_dir(geslon, geslat, glon(i), geslat, .false., &
+                          dist, degrees)
       
       if (dist > rad) then      
         if (i == fix_i) then
@@ -327,7 +533,7 @@ module core_tracker
   !-----------------
   !-- to the South--
   !-----------------
-    fix_j = int((geslat - glatmin + 2*dy)/dy)
+    fix_j = int((-geslat - glatmin + 2*dy)/dy)
     do jp=fix_j, fix_j + jmax - 1
       
       if (jp <= jmax) then
@@ -340,7 +546,8 @@ module core_tracker
         exit
      endif
       
-      call calcdist(geslon,geslat,geslon,glat(j),dist,degrees)
+      call calc_dist_dir(geslon, geslat, geslon, glat(j), .false., &
+                          dist, degrees)
       
       if (dist > rad) then      
         if (j == fix_j) then
@@ -354,7 +561,7 @@ module core_tracker
   !-----------------    
   !-- to the North--
   !-----------------
-    fix_j = int((geslat - glatmin + dy)/dy)
+    fix_j = int((-geslat - glatmin + dy)/dy)
     do jp=fix_j, -(fix_j + jmax - 1), -1
       
       if (jp >= 1) then
@@ -367,7 +574,8 @@ module core_tracker
         exit
       endif 
          
-      call calcdist(geslon,geslat,geslon,glat(j),dist,degrees)
+      call calc_dist_dir(geslon, geslat, geslon, glat(j), .false., &
+                          dist, degrees)
       
       if (dist > rad) then      
         if (j == fix_j) then
@@ -488,13 +696,15 @@ module core_tracker
 
     if ( verb .ge. 3 ) then
       print *,' '
-      print *,'*-----------------------------------------------*'
-      print *,'* Top of check_closed_contour, ix= ',ptx_i,' jx= ',ptx_j
-      print *,'*-----------------------------------------------*'
+      print *,'--------------------------------------------------------'
+      print *,'* Top of check_contour, ix= ',ptx_i,' jx= ',ptx_j
+      print *,'--------------------------------------------------------'
       print *,'cminmax: ', cminmax
       print *,'fxy(ix,jx)= ', xcentval
       print *,'minmial contour= ', contour_min
     endif
+    
+
 
 
     ! to simplify the if statements
@@ -512,8 +722,10 @@ module core_tracker
     pt_i(1) = ptx_i ! the points to be treated
     pt_j(1) = ptx_j 
 
-    ! all the points bellow contour_min connected to the central point
-    mask_object(ptx_i, ptx_j) = .false.
+    ! This array will represent all the points bellow contour_min connected
+    !   to the central point or with a negative gradient towards that later area
+    mask_object = .false.
+    mask_object(ptx_i, ptx_j) = .true.
 
     !nptb = 0 ! number of possible points at the border
 
@@ -524,12 +736,12 @@ module core_tracker
   !-- Loop on the points (pt_i, pt_j) --
   !-------------------------------------
     scan_contour: do while (ipt <= pt_max)
-      if ( verb .ge. 3 ) then
-        print *, " "
-        print *, " the following point is beeing treated: "
-        print *, " -lon: ", glon(pt_i(ipt))
-        print *, " -lat: ", glat(pt_j(ipt))
-      endif 
+      !if ( verb .ge. 3 ) then
+      !  print *, " "
+      !  print *, " the following point is beeing treated: "
+      !  print *, " -lon: ", glon(pt_i(ipt))
+      !  print *, " -lat: ", glat(pt_j(ipt))
+      !endif 
     
     
       call get_neighbours(pt_i(ipt), pt_j(ipt), fileinfo%grid_type, &
@@ -537,14 +749,10 @@ module core_tracker
           
       ! we hit the border of a regional grid
       if (fileinfo%grid_type == 'regional' .and. ptn /= 8) then
-      
-        if ( verb .ge. 3 ) then
-          print *,'We reach the border of a regional grid'
-        endif
-        
-        if ( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm > 0)  then
+        if ( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm < 0)  then
         
           if ( verb .ge. 3 ) then
+            print *,'We reach the border of a regional grid'
             print *,'The minimum contour is not closed'
           endif
           
@@ -567,15 +775,12 @@ module core_tracker
     !-----------------------------------
       scan_neighbour : do iptn=1,ptn
       
-      
+
         if (masked_out(ptn_i(iptn), ptn_j(iptn))) then
-          if ( verb .ge. 3 ) then
-            print *,'We reach the border of another object'
-          endif
-          
-          if ( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm > 0 ) then
+          if ( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm < 0 ) then
           
             if ( verb .ge. 3 ) then
+              print *,'We reach the border of another object'
               print *,'The minimum contour is not closed'
             endif
             
@@ -590,17 +795,13 @@ module core_tracker
 
 
         else if ((xcentval-fxy(ptn_i(iptn), ptn_j(iptn)))*mm < 0) then
-          if ( verb .ge. 3 ) then
-            print *, "We reach a point with a lower/higher value ", &
-                      "than the limit"
-            print *, "fxy(i,j) :", fxy(ptn_i(iptn), ptn_j(iptn))
-            print *, "limit: ", xcentval
-            print *, "cminmax: ", cminmax
-          endif
-
-          if ( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm > 0 ) then
+          if ( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm < 0 ) then
           
             if ( verb .ge. 3 ) then
+              print *, "We reach a point with a lower/higher value ", &
+                        "than the central point"
+              print *, "fxy(i,j) :", fxy(ptn_i(iptn), ptn_j(iptn))
+              print *, "cminmax: ", cminmax
               print *,'The minimum contour is not closed'
             endif
             
@@ -615,7 +816,7 @@ module core_tracker
           
         ! There is nothing to do if the point is already in mask_object
         else if (.not. mask_object(ptn_i(iptn), ptn_j(iptn))) then
-          if (( (contour_min-fxy(pt_i(ipt), pt_j(ipt)))*mm <= 0 ) .or. &
+          if (( (contour_min-fxy(ptn_i(iptn), ptn_j(iptn)))*mm <= 0 ) .or. &
               ( (fxy(pt_i(ipt), pt_j(ipt)) - &
                  fxy(ptn_i(iptn), ptn_j(iptn)))*mm > 0 )) then
         
@@ -637,7 +838,10 @@ module core_tracker
 
     if (.not. contour_close .and. .not. forced) then
     
-      mask_object = .false.
+      ! mask_object = .false. we keep this as none of the point already
+      !   investigted could be the center of a new low: it will hit the 
+      !   point investigated here, which has a lower value 
+      !   (only in first_ges_center)
       mask_object_cc = .false.
       contour_max = xcentval
       rcontour_max = -999.
@@ -700,17 +904,21 @@ module core_tracker
 
           call get_neighbours(i, j, fileinfo%grid_type, &
               imax, jmax, ptn, ptn_i, ptn_j)
-          
+              
+
           on_border = .false.
-          do iptn=1,ptn
-            if(.not. mask_object_cc(ptn_i(iptn),ptn_j(iptn))) then
-              on_border = .true.
-            endif
-          enddo
+          
+          if (ptn == 8) then ! not at this edge of the grid
+            do iptn=1,ptn
+              if(.not. mask_object_cc(ptn_i(iptn),ptn_j(iptn))) then
+                on_border = .true.
+              endif
+            enddo
+          endif
           
           if(on_border) then
-            call calcdist(glon(ptx_i), glat(ptx_j), glon(i), glat(j), &
-                    dist,degrees)
+            call calc_dist_dir(glon(ptx_i), glat(ptx_j), glon(i), &
+                    glat(j), .false., dist, degrees)
             nb = nb + 1
             rcontour_max = rcontour_max + dist
           endif
@@ -724,14 +932,12 @@ module core_tracker
 
   end subroutine
   
-    
-
   
   !---------------------------------------------------------------------------------
   !--------------- Subroutine searching for a minmax around a point-----------------
   !---------------------------------------------------------------------------------
   subroutine find_minmax(geslon, geslat, fxy, minmax, ptc_i, ptc_j, &
-                clon, clat, cval)
+                clon, clat, cval, found)
   
 ! This subroutine looks for either local minimum or maximum of a field 
 !     fxy around a point determine by its coordinates (geslon, geslat).
@@ -766,6 +972,8 @@ module core_tracker
   ! clon    longitude of the minmax
   ! clat    latitude  of the minmax
   ! cval    value of fxy at the minmax
+  ! logical indicating if a point was found
+  
 
     implicit none
 
@@ -775,6 +983,7 @@ module core_tracker
     real, intent(out) :: clon, clat
     integer, intent(out) :: ptc_i, ptc_j
     real, intent(out) :: cval
+    logical, intent(out) :: found
     
     integer ibeg, jbeg, iend, jend ! the boundaries of the local grid
     real, allocatable :: fxy2(:,:) ! local version of fxy
@@ -784,7 +993,7 @@ module core_tracker
     integer nptm, ptm(2), iptm, ptm2(1) ! for the possible minmax
     integer, allocatable :: ptm_i(:), ptm_j(:) ! for the possible minmax
     integer ptn, ptn_i(8), ptn_j(8), iptn ! the neighbours
-    real val(imax*jmax)
+    real fact(imax*jmax)
     logical local_minmax
     integer i,j 
 
@@ -792,13 +1001,19 @@ module core_tracker
     
     integer ret
 
-
+    
+    
+    if ( verb .ge. 3 ) then
+      print *, ""
+      print *, "Looking for a minmax ..."
+    endif
+    
   !------------------------------------------------
   !-- Set up the mask where to look for a minmax --
   !-- It reduces the area studied -----------------
   !------------------------------------------------
     call get_ij_bounds(geslon, geslat, trkrinfo%rad, ibeg, jbeg, iend, jend, ret)
-
+    
     if (ret == 71) then
       if ( verb .ge. 1 ) then
         print *, ""
@@ -812,17 +1027,17 @@ module core_tracker
       STOP 71
     endif
 
-    if (ret == 72) then
-      if ( verb .ge. 1 ) then
-        print *, ""
-        print *, "!!! ERROR 72 in find_minmax, from get_ij_bounds:"
-        print *, "!!! The caracteristic size of the object provided by"
-        print *, "!!! the user, rad (", trkrinfo%rad, ")"
-        print *, "!!! is larger than 1/2 circonference of the Earth"
-        print *, "!!! Too many minmax can be found, tracking ends"
-      endif
-      STOP 72
-    endif
+    !if (ret == 72) then
+    !  if ( verb .ge. 1 ) then
+    !    print *, ""
+    !    print *, "!!! ERROR 72 in find_minmax, from get_ij_bounds:"
+    !    print *, "!!! The caracteristic size of the object provided by"
+    !    print *, "!!! the user, rad (", trkrinfo%rad, ")"
+    !    print *, "!!! is larger than 1/2 circonference of the Earth"
+    !    print *, "!!! Too many minmax can be found, tracking ends"
+    !  endif
+    !  STOP 72
+    !endif
           
     if ( verb .ge. 2 .and. ret < 0) then
       print *, ""
@@ -831,6 +1046,7 @@ module core_tracker
       print *, " This might lead to some problem in finding a minmax"
     endif
     
+
         
     if (ibeg > iend) then ! wrapping, Rq, ibeg > 0 by definition
     
@@ -876,10 +1092,10 @@ module core_tracker
       jmax2 = jend-jbeg+1 ! for the call to get_neighbours
       
     endif
-
+    
     
     ! fill mask_s, the mask of search, only trues will be analysed
-    mask_s = .not. masked_out
+    mask_s = .true.
     do i=ibeg,iend2 ! Rq: 0 < ibeg < iend2, wrapping or not
     
       !wrapping
@@ -888,9 +1104,10 @@ module core_tracker
       
       do j=jbeg,jend
       
-        call calcdist(geslon,geslat,glon(iw),glat(j),dist,degrees)
-        
-        if (dist > trkrinfo%rad) then
+        call calc_dist_dir(geslon, geslat, glon(iw), glat(j), .false., &
+                            dist, degrees)
+                            
+        if (dist > trkrinfo%rad .or. masked_out(iw, j)) then
           mask_s(i - ibeg + 1, j - jbeg + 1) = .false.
         endif
       enddo
@@ -900,6 +1117,10 @@ module core_tracker
     mean = sum(fxy2, mask = mask_s)/count(mask_s)
     sd   = sqrt(sum((fxy2-mean)**2, mask = mask_s)/(count(mask_s)-1))
     
+    !print *, ibeg, iend
+    !print *, jbeg, jend
+    
+
 
   !-----------------------------
   !-- search for local minmax --    
@@ -916,7 +1137,7 @@ module core_tracker
       endif 
       STOP 75
     endif      
-    
+        
     do while (any(mask_s))
     
       if (minmax == 'min') then
@@ -947,13 +1168,13 @@ module core_tracker
           
           if (minmax == 'min') then
             if (fxy2(ptn_i(iptn), ptn_j(iptn)) < &
-                fxy(ptm(1), ptm(2))) then
+                fxy2(ptm(1), ptm(2))) then
               local_minmax = .false.
               exit
             endif
           else 
             if (fxy2(ptn_i(iptn), ptn_j(iptn)) > &
-                fxy(ptm(1), ptm(2))) then
+                fxy2(ptm(1), ptm(2))) then
               local_minmax = .false.
               exit
             endif
@@ -980,17 +1201,34 @@ module core_tracker
   !---------------------------------------------------
   !-- Determine the most likely minmax local minmax --    
   !---------------------------------------------------
+    if (verb >= 3) then
+      print *, "   lon    lat         val       dist   fact"
+    endif
+    fact = 0
+
     if (nptm > 0) then
       do iptm=1,nptm
-        call calcdist(geslon,geslat,glon(ptm_i(iptm)),glat(ptm_j(iptm)), &
-               dist,degrees)
       
-        val(iptm) = ((fxy2(ptm_i(iptm), ptm_j(iptm))-mean)/sd)* &
+        call calc_dist_dir(geslon, geslat, glon(ptm_i(iptm) + ibeg -1), &
+                   glat(ptm_j(iptm) + jbeg - 1), .false., dist, degrees)
+      
+        fact(iptm) = ((fxy2(ptm_i(iptm), ptm_j(iptm))-mean)/sd)* &
                     ((dist-trkrinfo%rad)/trkrinfo%rad)**2
+                    
+                    
+        if (verb >= 3) then
+          print "(F7.2, F7.2, ES12.4, EN11.2, F7.3)", &
+            glon(ptm_i(iptm) + ibeg -1), glat(ptm_j(iptm) + jbeg - 1), &
+            fxy2(ptm_i(iptm), ptm_j(iptm)), dist, fact(iptm)
+        endif
       enddo
-    
-      ptm2 = maxloc(val)
-    
+      
+      if (minmax == 'min') then
+        ptm2 = minloc(fact(1:nptm))
+      else 
+        ptm2 = maxloc(fact(1:nptm))
+      endif      
+      
       ptc_i = ptm_i(ptm2(1)) + ibeg - 1
       ptc_j = ptm_j(ptm2(1)) + jbeg - 1
       
@@ -1002,6 +1240,8 @@ module core_tracker
         ptc_i = ptc_i - imax
       endif
       
+      found = .true.
+      
     else
       ptc_i = -999
       ptc_j = -999
@@ -1009,7 +1249,24 @@ module core_tracker
       clon = -9999.
       clat = -9999.
       cval = -9999.
+      
+      found = .false.
     endif
+    
+    
+     if ( verb .ge. 3 ) then
+      if (found) then
+        print *, "A new minmax has been found around (", &
+                  geslon, geslat, ") at :"
+        print *, "-lon: ", clon
+        print *, "-lat: ", clat
+        print *, "-val: ", cval        
+      else
+        print *, "No minmax found around (", geslon, geslat, ")"
+      endif
+    endif
+
+    print *, "toto2"
 
   
   end subroutine
@@ -1022,8 +1279,8 @@ module core_tracker
   !---------------------------------------------------------------------------------
 
   subroutine fixcenter (pt_i, pt_j, mask_object_max, &
-                mask_object_min, mask_object, fix_lon, fix_lat, fixvals, &
-                contour_max, rcontour_max)
+                mask_object_min, mask_object, fix_lon, fix_lat, &
+                fixvals, contour_max, rcontour_max)
 
 
 ! It precises the center of an object, depending on the minmax from the 
@@ -1043,6 +1300,7 @@ module core_tracker
   ! fix_lon   longitude of the center
   ! fix_lat   latitude  of the center
   ! fixvals   values of the minmax found for the fields data_fixcenter
+  ! mask_object   the actual mask of the object, to add to masked_out
   
   ! IN-OUT
   ! contour_max     equals contour_max from find_minmax on data_detection,
@@ -1064,13 +1322,14 @@ module core_tracker
     
     real geslon, geslat ! the lon/lat of the center from the field detection
     
-      ! the centers in the different fields
-    real clon(numfield%fixcenter + 1), clat(numfield%fixcenter + 1)
-    integer ptc_i(numfield%fixcenter + 1), ptc_j(numfield%fixcenter + 1)
+      ! the centers in the different fixcenter fields
+    real clon(numfield%fixcenter), clat(numfield%fixcenter)
+    integer ptc_i(numfield%fixcenter), ptc_j(numfield%fixcenter)
+    logical found(numfield%fixcenter)
       
     real fix_lon1, fix_lat1 ! the center after simple average
     integer ifc, nfc ! number of fixcenter fields with a minmax
-    integer nb, i, j, iptn, ptn, ptn_i, ptn_j, ccret
+    integer nb, i, j, iptn, ptn, ptn_i(8), ptn_j(8), ccret
     real wt, wts, dist, degrees, val
     logical in_mask, on_border, mask_object_notused(imax, jmax)
 
@@ -1078,23 +1337,43 @@ module core_tracker
 
     if ( verb >= 3 ) then
       print *, " "
-      print *, "-------------------------------"
-      print *, " At the beginning of fixcenter "
-      print *, "-------------------------------"
+      print *, "--------------------------------"
+      print *, "* At the beginning of fixcenter "
+      print *, "--------------------------------"
     endif
+    
+    
+    geslon = glon(pt_i)
+    geslat = glat(pt_j)
+    
+    
+    if (.not. any(Rflag%fixcenter) .or. numfield%fixcenter == 0) then
+      if ( verb >= 3 ) then
+        print *, "No data are available for center fixing"    
+        print *, "The center remains the same as previously detected:"
+        print *, " -lon: ", geslon
+        print *, " -lat: ", geslat
+      endif
+      fix_lon = geslon
+      fix_lat = geslat
+      mask_object = mask_object_min
+      fixvals = -9999.
+      return
+    endif
+      
 
      
   !-------------------------------------------------------------
   !-- First, we compute the minmax of the fields in fixcenter --
   !-------------------------------------------------------------
-   
-    geslon = glon(pt_i)
-    geslat = glat(pt_j)
-      
     do ifc = 1, numfield%fixcenter
-      call find_minmax(geslon, geslat, data_fixcenter(:,:,ifc), &
-              fname%fc_minmax(ifc), ptc_i(ifc), ptc_j(ifc), &
-              clon(ifc),clat(ifc),fixvals(ifc))
+      if (Rflag%fixcenter(ifc)) then
+        call find_minmax(geslon, geslat, data_fixcenter(:,:,ifc), &
+                fname%fc_minmax(ifc), ptc_i(ifc), ptc_j(ifc), &
+                clon(ifc),clat(ifc),fixvals(ifc), found(ifc))
+      else
+        found(ifc) = .false.
+      endif
     enddo
     
     
@@ -1111,14 +1390,14 @@ module core_tracker
       print *, " The centers are: "
 
       do ifc = 1, numfield%fixcenter
-        print *, " For ", trim(fname%fixcenter(ifc)), "-", &
-                    fname%fixcenter_lev(ifc)
-        print *, " lon: ",glon(ptc_i(ifc))," lat: ",glat(ptc_j(ifc)), &
-                 " val: ", fixvals(ifc)
+        if(found(ifc)) then
+            print *, " For ", trim(fname%fixcenter(ifc)), "-", &
+                      fname%fixcenter_lev(ifc)
+          print *, " lon: ",glon(ptc_i(ifc))," lat: ",glat(ptc_j(ifc)), &
+                   " val: ", fixvals(ifc)
+        endif
       enddo
-      
-      print *, " If values are -9999 it means a minmax wasn't found"
-      
+
     endif
 
 
@@ -1141,7 +1420,7 @@ module core_tracker
     
     nfc = 0
     do ifc = 1, numfield%fixcenter
-      if (fixvals(ifc) > -9998.) then
+      if (found(ifc)) then
         nfc = nfc + 1
         fix_lat = fix_lat + glat(ptc_j(ifc))
         if(fileinfo%grid_type == 'global') then
@@ -1163,7 +1442,7 @@ module core_tracker
 
 
     ! weighted average
-    call calcdist(fix_lon1, fix_lat1, geslon, geslat, &
+    call calc_dist_dir(fix_lon1, fix_lat1, geslon, geslat, .false., &
             dist, degrees)
               
     if (dist > trkrinfo%rad) then ! priority to the detection field
@@ -1181,10 +1460,10 @@ module core_tracker
     
     nfc = 0
     do ifc = 1, numfield%fixcenter
-      if (fixvals(ifc) > -9998.) then
+      if (found(ifc)) then
       
-        call calcdist(fix_lon1, fix_lat1, glon(ptc_i(ifc)), &
-                glat(ptc_j(ifc)), dist, degrees)
+        call calc_dist_dir(fix_lon1, fix_lat1, glon(ptc_i(ifc)), &
+                glat(ptc_j(ifc)), .false.,  dist, degrees)
         
         if (dist > trkrinfo%rad) then ! the parameter is not considered
           if (verb >= 3) then
@@ -1241,19 +1520,23 @@ module core_tracker
     in_mask = .true.
     
     do ifc = 1,numfield%fixcenter
-      if (.not. mask_object_min(ptc_i(ifc), ptc_j(ifc))) then
-        val = data_detection(ptc_i(ifc), ptc_j(ifc))
+      if (found(ifc)) then
+      
+        if (.not. mask_object_min(ptc_i(ifc), ptc_j(ifc))) then
+          val = data_detection(ptc_i(ifc), ptc_j(ifc))
         
-        if (fname%detec_minmax == 'min') then
-          contour_max = max(contour_max, val)
-        else
-          contour_max = min(contour_max, val)
-        endif
+          if (fname%detec_minmax == 'min') then
+            contour_max = max(contour_max, val)
+          else
+            contour_max = min(contour_max, val)
+          endif
         
-        if(.not. mask_object_max(ptc_i(ifc), ptc_j(ifc))) then
-          in_mask = .false.
-        endif
-        
+          if(.not. mask_object_max(ptc_i(ifc), ptc_j(ifc))) then
+            in_mask = .false.
+          endif
+          
+        endif  
+            
       endif
     enddo
     
@@ -1292,8 +1575,8 @@ module core_tracker
             enddo
             
             if(on_border) then
-              call calcdist(fix_lon, fix_lat, glon(i), glat(j), &
-                      dist,degrees)
+              call calc_dist_dir(fix_lon, fix_lat, glon(i), glat(j), &
+                                  .false., dist, degrees)
               nb = nb + 1
               rcontour_max = rcontour_max + dist
             endif
@@ -1317,17 +1600,15 @@ module core_tracker
   !----- Subroutine that compute the movement speed and direction of an object -----
   !---------------------------------------------------------------------------------  
   subroutine get_speed_dir(iobj, its, fixlon, fixlat, mask_object, &
-                              first_detection, speed, direction)  
-  ! 
+                              first_detection)  
+  ! It fills speed and direction vectors defined in the module
+  ! Note: speed is in m/s, as should be the advection field
   
     implicit none
     
     integer, intent(in) :: iobj, its
     real, intent(in) :: fixlon, fixlat
     logical, intent(in) :: first_detection, mask_object(:,:)
-    
-    real, intent(out) :: speed, direction
-    
     
     real dist, degree ! in calcdist
     real extrapoled_direction, extrapoled_speed, dt
@@ -1338,6 +1619,12 @@ module core_tracker
     real wts, wt ! weightening for the mean wind
     integer i, j, iadv
     
+    
+    
+    if (verb >= 3) then
+      print *, ""
+      print *, "Computing speed and direction ..."
+    endif 
     
    
   !------------------------------------
@@ -1357,11 +1644,24 @@ module core_tracker
           dt = ts_tim(its) - ts_tim(its-1)
         endif
         
-        call calcdist(prevlat(iobj), prevlon(iobj), fixlat, fixlon, &
-                dist, degree)
+        ! to get dt in seconds
+        if (fileinfo%time_unit == 'minutes') then
+          dt = dt*60
+        else if (fileinfo%time_unit == 'hours') then
+          dt = dt*3600
+        else if (fileinfo%time_unit == 'days') then
+          dt = dt*3600*24
+        else if (fileinfo%time_unit == 'months') then
+          dt = dt*3600*24*30.4375
+        else if (fileinfo%time_unit == 'years') then
+          dt = dt*3600*24*365.25
+        endif
+        
+        call calc_dist_dir(prevlon(iobj), prevlat(iobj), fixlon, &
+                fixlat, .true., dist, degree)
                 
         extrapoled_direction = degree
-        extrapoled_speed = dist / dt
+        extrapoled_speed = dist * 1000 / dt ! this is m/s
         extrapol = .true.
         
       else
@@ -1376,6 +1676,7 @@ module core_tracker
         extrapol = .false.
         
       endif
+    else
       extrapol = .false.
     endif
 
@@ -1394,14 +1695,16 @@ module core_tracker
     wind_u = 0
     wind_v = 0
     n_ij = 0
+    wts = 0
+    
   
     do i=1,imax
       do j=1,jmax
         if (mask_object(i,j)) then
         
-          call calcdist(glon(i), glat(j), fixlat, fixlon, &
+          call calc_dist_dir(glon(i), glat(j), fixlon, fixlat, .true., &
                 dist, degree)
-
+                
           if (dist < trkrinfo%rad) then
 
             wind_speed_ij = 0
@@ -1410,17 +1713,20 @@ module core_tracker
             n_ij = n_ij + 1
             
             do iadv=1,numfield%advection
-              wind_speed_ij = wind_speed_ij + sqrt(data_u(i,j,iadv)**2 &
-                                                  + data_v(i,j,iadv)**2)
-              wind_u_ij = wind_u_ij + data_u(i,j,iadv)
-              wind_v_ij = wind_v_ij + data_v(i,j,iadv)
+              if (Rflag%advection(iadv)) then
+                wind_speed_ij = wind_speed_ij + &
+                  sqrt(data_u(i,j,iadv)**2 + data_v(i,j,iadv)**2)
+                wind_u_ij = wind_u_ij + data_u(i,j,iadv)
+                wind_v_ij = wind_v_ij + data_v(i,j,iadv)
+              endif
             enddo
 
             wt = ((dist-trkrinfo%rad)/trkrinfo%rad)**2
             wts = wts + wt
-            wind_speed = wind_speed + wind_speed_ij/numfield%advection*wt
-            wind_u = wind_u + wind_u_ij/numfield%advection*wt
-            wind_v = wind_v + wind_v_ij/numfield%advection*wt
+            wind_speed = wind_speed + &
+                         wind_speed_ij/count(Rflag%advection)*wt
+            wind_u = wind_u + wind_u_ij/count(Rflag%advection)*wt
+            wind_v = wind_v + wind_v_ij/count(Rflag%advection)*wt
             
 
           endif
@@ -1429,7 +1735,8 @@ module core_tracker
       enddo
     enddo
     
-    wind_speed = wind_speed / n_ij
+    wind_speed = wind_speed / wts
+    ! no need tonormalised wind_u / wind_v
 
     ! 360 is the North, 0 means no wind
     if (wind_u == 0.0) then
@@ -1460,16 +1767,22 @@ module core_tracker
   !-----------------------------
   
     if(extrapol) then
-      speed = (wind_speed + extrapoled_speed)/2
-      direction= (wind_direction + extrapoled_direction)/2
+      speed(iobj) = (wind_speed + extrapoled_speed)/2
+      direction(iobj) = (wind_direction + extrapoled_direction)/2
+      if (abs(wind_direction - extrapoled_direction) > 180) then ! across 0°
+        direction(iobj) = direction(iobj) - 180
+        if (direction(iobj) < 0) then
+          direction(iobj) = direction(iobj) + 360
+        endif
+      endif
      else
-      speed = wind_speed
-      direction = wind_direction
+      speed(iobj) = wind_speed
+      direction(iobj) = wind_direction
     endif
     
     if ( verb .ge. 3 ) then
       print *, ""
-      print *, "Speed and direction have calculated for the object: ", &
+      print *, "Speed and direction for the object: ", &
                 names_obj(iobj)
       print *, "wind direction: ", wind_direction
       print *, "wind_speed: ", wind_speed
@@ -1480,9 +1793,9 @@ module core_tracker
         print *, "No extrapolation was computed"
       endif
       print *, "therefore,"
-      print *, "object direction (in °): ", direction
+      print *, "object direction (in °): ", direction(iobj)
       print *, "object speed (in km/", trim(fileinfo%time_unit), &
-                  "): ", speed
+                  "): ", speed(iobj)
     endif
                   
       
@@ -1494,7 +1807,7 @@ module core_tracker
   !---------------------------------------------------------------------------------
   !----- Subroutine searching for new local min / max in the "detection" field -----
   !---------------------------------------------------------------------------------
-  subroutine first_ges_center (its, ilast_object)
+  subroutine first_ges_center (its, ilast_object, masked)
 
 ! This subroutine searches for new object within the boundary of the box
 !   of search fixed by the user in tha namelist. The areas masked by
@@ -1505,20 +1818,24 @@ module core_tracker
   
   ! INPUT
   ! its    the timestep considered
+  ! masked collect from main subroutines all the mask_object_max
+  !        computed in check_contour from the previously tracked object.
+  !        There can not be any new minmax there
   
   ! INOUT
   ! ilast_object   the total number of object caracterised during the
   !                   run of the program
   
-  
+    use test
     implicit none
     
     integer, intent(in)    :: its
+    logical, intent(in)    :: masked(:,:)
     integer, intent(inout) :: ilast_object
     
     integer ibeg, iend, jbeg, jend
-    integer iptn, ptn, ptn_i, ptn_j ! from get_neighbours
-    logical mask_detec(imax,jmax), mask_object(imax,jmax)
+    integer iptn, ptn, ptn_i(8), ptn_j(8) ! from get_neighbours
+    logical mask_detec(imax, jmax), mask_object(imax,jmax)
     logical mask_object_max(imax,jmax), mask_object_min(imax,jmax)
     real contour, minmax_val, contour_max, rcontour_max
     real fixlon, fixlat, speed, direction
@@ -1526,14 +1843,14 @@ module core_tracker
     integer ccret, ptx(2), ilast_object_old, iint
     integer ptc_i(numfield%intensity), ptc_j(numfield%intensity) ! not used
     real clon(numfield%intensity), clat(numfield%intensity) ! not used
-    
+    logical found(numfield%intensity) !not used    
     
     
     if ( verb .ge. 2 ) then
       print *,' '
-      print *,'*----------------------------*'
-      print *,'* At top of first_ges_center *'
-      print *,'*----------------------------*'
+      print *,'*-------------------------*'
+      print *,'* Top of first_ges_center *'
+      print *,'*-------------------------*'
 
     endif
     
@@ -1577,7 +1894,7 @@ module core_tracker
     endif
     
     if ( verb .ge. 2 ) then
-      print *, "The indies of the boundary box are :"    
+      print *, "The indices of the boundary box are :"    
       print *, "jbeg: ", jbeg
       print *, "jend: ", jend
       print *, "ibeg: ", ibeg
@@ -1588,8 +1905,8 @@ module core_tracker
   !-----------------------------------------------------
   !-- define mask_detec, where to look for new minmax --
   !-----------------------------------------------------
-    ! hide the areas where the objects already being tracked are
-    mask_detec = .not. masked_out
+    ! mask_detec hide the areas where the objects already being tracked are
+    mask_detec = .not. masked
 
     ! hide the areas beyond the box of search
     if (ibeg < 1) then
@@ -1626,6 +1943,7 @@ module core_tracker
     endif
 
   ilast_object_old = ilast_object
+  
 
 
   !---------------
@@ -1633,7 +1951,7 @@ module core_tracker
   !---------------
     ! It exits only when the minmax value not masked are above/below the
     ! threshold, or when all the points are masked
-    search_loop: do while (any(masked_out))
+    search_loop: do while (any(mask_detec))
   
       if (fname%detec_minmax == 'min') then
         ptx = minloc(data_detection, mask = mask_detec)
@@ -1654,6 +1972,8 @@ module core_tracker
       endif
 
       if ( verb .ge. 3 ) then
+        print *,""
+        print *,""
         print *,'Found a possible max/min at ptx(1)= ', &
                   ptx(1),' ptx(2)= ',ptx(2)
       endif
@@ -1676,14 +1996,9 @@ module core_tracker
           print *, "No contour has been found: no new object"
         endif        
 
-        ! We don't want to find this local minimum or its 8 surrounding
-        ! points again in a search on a subsequent iteration of this loop.
-        call get_neighbours(ptx(1), ptx(2), fileinfo%grid_type, &
-                imax, jmax, ptn, ptn_i, ptn_j)
-        do iptn = 1,ptn
-          mask_detec(ptn_i(iptn),ptn_j(iptn)) = .false.
-        enddo
-        mask_detec(ptx(1),ptx(2)) = .false.
+        ! We don't want to find this local minimum and the points
+        !   already detected as being under his influence
+        mask_detec = mask_detec .and. .not. mask_object_max
           
         cycle search_loop
 
@@ -1698,7 +2013,7 @@ module core_tracker
           print *, "ERROR 51 in first_ges_center:"
           print *, "The maximum number of object has been reached"
           print *, "The program can be relauched from "
-          print *, "that timestep; ts_tim(its): ", ts_tim(its)
+          print *, "that timestep; ts_tim(its): ", print_ts_tim(its)
           print *, "Using the record of the last objects being"
           print *, "tracked will discard all the old storms"
         endif  
@@ -1709,6 +2024,8 @@ module core_tracker
       ilast_object = ilast_object + 1
       if ( verb .ge. 3 ) then
         print *, "A contour has been found: this is a new object"
+        print *, "contour_max: ", contour_max
+        print *, "rcontour_max: ", rcontour_max
       endif
 
 
@@ -1722,24 +2039,42 @@ module core_tracker
       call newobject_name(its, ilast_object, fixlon, fixlat)
       prevlon(ilast_object) = fixlon
       prevlat(ilast_object) = fixlat
+      minmax_detec(ilast_object) = minmax_val
+      beingTracked(ilast_object) = .true.
+      
 
 
       ! compute the minmax for the fields intensity
+      if (verb >= 3) then
+        print *, ""
+        print *, "Intensity minmax:"
+        print *, "-----------------"
+      endif
       do iint = 1, numfield%intensity
-        call find_minmax(fixlon, fixlat, data_intensity(:,:,iint), &
-                fname%int_minmax(iint), ptc_i(iint), ptc_j(iint), &
-                clon(iint),clat(iint),vals_int(iint))
+        if (Rflag%intensity(iint)) then
+          call find_minmax(fixlon, fixlat, data_intensity(:,:,iint), &
+                  fname%int_minmax(iint), ptc_i(iint), ptc_j(iint), &
+                  clon(iint),clat(iint),vals_int(iint), found(iint))
+        else
+          found(iint) = .false.
+          ptc_i(iint) = -999
+          ptc_j(iint) = -999
+          clon(iint)  = -9999.
+          clat(iint)  = -9999.
+          vals_int(iint) = -9999.
+        endif
       enddo
       
+
+      
+
       ! compute speed and direction from wind speed
-      call get_speed_dir(ilast_object, its, fixlon, fixlat, mask_object, &
-                           .true., speed, direction)
-
-
+      call get_speed_dir(ilast_object, its, fixlon, fixlat, &
+                           mask_object, .true.)
+         
       ! write ouputs
-      call default_output(ilast_object, its, fixlon, fixlat, &
-                    minmax_val, contour_max, rcontour_max, &
-                    vals_fc, vals_int, speed, direction)
+      call default_output(ilast_object, its, contour_max, &
+                            rcontour_max, vals_fc, vals_int)
 
 
       ! fill mask_detec with new false and masked_out with true

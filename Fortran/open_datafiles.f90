@@ -6,6 +6,7 @@
 !25-10-2017 Creation
 !12-12-2017 1st Commit -> 1st version
 !12-01-2018 2nd commit -> values in fort.15 can't be negative
+!24-01-2018 2nd commit -> working version
 
 ! RQ for further developments:
 ! Is it possible that a the time dimension is not oredered in a netcdf?
@@ -20,7 +21,7 @@
 ! CONTAINS :
 !   The module "data_param" with all the variable realtive to the data
 ! 
-!   The module "datafile" with the distributive subroutines :
+!   The module "read_datafile" with the distributive subroutines :
 !       - open_file
 !       - getgridinfo
 !       - getdata(ts)
@@ -434,6 +435,14 @@ module netcdf_datafile
     logical Rflag_detection(1)
     integer err_a1, err_a2
     real data_detection2(imax, jmax,1)
+
+
+
+    if ( verb .ge. 3 ) then
+      print *,' '
+      print *,'Loading the data:'
+      print *,'-----------------'
+    endif 
  
     
     ! loading the field for detection of new lows
@@ -462,7 +471,7 @@ module netcdf_datafile
                   fname%fixcenter_lev, ts, &
                   Rflag%fixcenter, data_fixcenter)  
 
-    if (.not. any(Rflag%fixcenter)) then
+    if (.not. any(Rflag%fixcenter) .and. numfield%fixcenter /= 0) then
       if (verb .ge. 1) then
         print *, ""
         print *, "WARNING: in getdata_netcdf, not all the fixcenter"
@@ -577,12 +586,7 @@ module netcdf_datafile
 
     iddim = (/0,0,0,0/) ! (lon,lat,time,level) 
   
-    if ( verb .ge. 3 ) then
-      print *,' '
-      print *,'Beginning of the subroutine find_var'
-    endif 
-    
-    
+   
     nameloop : do n = 1,nvar
     
       ret1 = nf90_inq_varid(ncid,name_var(n),varid)
@@ -682,15 +686,17 @@ module netcdf_datafile
             endif
           endif
         endif
+      
+        if ( verb .ge. 1 ) then
+          print *,' '
+          print *, '!!! Error 164 in subroutine find_var'
+          print *, '!!! when analysing the level dimension'
+          print *, '!!! of the variable ',name_var(n)
+        endif
+        go to 160 ! skip name
+        
       endif
       
-      if ( verb .ge. 1 ) then
-        print *,' '
-        print *, '!!! Error 164 in subroutine find_var'
-        print *, '!!! when analysing the level dimension'
-        print *, '!!! of the variable ',name_var(n)
-      endif
-      go to 160 ! skip name
       172 continue ! from the reading of the level values
 
       
@@ -902,6 +908,14 @@ module read_datafile
   
     implicit none
     
+    
+    if (verb >= 2) then
+      print *, ""
+      print *, ""
+      print *, "inquiring the grid format:"
+      print *, "--------------------------"
+    endif
+    
     if (fileinfo%file_type == "netcdf") then
       call getgridinfo_netcdf
     endif
@@ -968,8 +982,11 @@ module time_step
     endif
     
     if (verb .ge. 2) then
+      print *, ""
+      print *, "*-------------------------------------------------*"
       print *, "After call readts, the number of time step read is: "
       print *, nts
+      print *, "*-------------------------------------------------*"
     endif
     
     
@@ -1004,7 +1021,9 @@ module time_step
     
     
     if ( verb .ge. 3 ) then
-      print *,'Reading fort.15 file ...'
+      print *, ""
+      print *, "*-----------------------------------------*"
+      print *, "Reading fort.15 file ..."
     endif
           
     nts = 0
@@ -1012,12 +1031,12 @@ module time_step
       nts = nts + 1
       read (iunit_ts, "(i4,1x,i4)", end=120) its_num(nts), its_tim(nts)      
       if ( verb .ge. 3 ) then
-        print "(A,i4,A,i4)", "Read fort.15 : its_num = ", its_num, &
-                                            "its_tim = ", its_tim
+        print "(A,i4,A,i4)", "Read fort.15 : its_num = ", its_num(nts), &
+                                            "its_tim = ", its_tim(nts)
       endif      
     enddo   
     120 continue
-
+    nts = nts - 1
 
     if (allocated(ts_num))  deallocate (ts_num)
     if (allocated(ts_tim))  deallocate (ts_tim)       
@@ -1049,6 +1068,23 @@ module time_step
       endif
       STOP 122
     endif  
+    
+    if (minval(ts_tim) < 0) then
+      if ( verb .ge. 1 ) then
+        print *,' '
+        print *, "!!! ERROR 123 when reading fort.15 :"
+        print *, "!!! the minimal value of ts_tim is < 0, meaning that"
+        print *, "!!! the first time step is before startdate"
+        print *, "!!! please change stardate such as all ts_tim > 0"
+        print *, '!!! STOPPING EXECUTION'
+      endif
+      STOP 123
+    endif  
+
+    if ( verb .ge. 3 ) then
+      print *, "*-----------------------------------------*"
+    endif
+    
     
   end subroutine
   
@@ -1156,10 +1192,12 @@ module time_step
         write(startdate, "(I0.4,A,I0.2,A,I0.2,A,I0.2,A,I0.2,A,I0.2)") &
                   Y,"-", M,"-", D," ", h,":", n,":", s
                    
-        if (startdate /= trkrinfo%startdate) then
+        if (trim(startdate) /= trim(trkrinfo%startdate)) then
           print *, ""
           print *, "!!! ERROR 114: The startdate in the netcdf file does't"
-          print *, "!!! correspond to the one provided in the namelist"   
+          print *, "!!! correspond to the one provided in the namelist"
+          print *, "!!! startdate file: " , startdate
+          print *, "!!! in namelist   : " , trkrinfo%startdate
           STOP 114
         endif
       
@@ -1195,7 +1233,7 @@ module time_step
       else
         print *, ""
         print *, "!!! ERROR 117 when filling fort.15"
-        print *, "!!! one of the time value exceed the format: "
+        print *, "!!! one of the time value exceed the format [0,9999]"
         print *, "!!! i=", i, "values(i)=", values(i)
         STOP 117
       endif
